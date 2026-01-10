@@ -74,6 +74,10 @@ const MainApp = () => {
   const [messageInput, setMessageInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const [contextMenuMessageId, setContextMenuMessageId] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
   const messagesEndRef = useRef(null);
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
