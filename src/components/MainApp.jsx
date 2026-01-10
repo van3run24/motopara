@@ -1541,12 +1541,11 @@ const MainApp = () => {
 
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Имя</label><input type="text" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Возраст</label><input type="number" min="18" max="100" value={userData.age || ''} onChange={e => setUserData({...userData, age: parseInt(e.target.value) || 18})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-orange-500 uppercase">Город</label>
+                <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Город</label>
                   <select value={userData.city} onChange={e => setUserData({...userData, city: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none appearance-none cursor-pointer">
                     {cities.map(c => <option key={c.name} value={c.name} className="bg-zinc-900">{c.name}</option>)}
                   </select>
                 </div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Байк</label><input type="text" value={userData.bike || ''} onChange={e => setUserData({...userData, bike: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" placeholder="Yamaha R1" /></div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-600 uppercase">Пол</label>
                   <select 
@@ -1558,6 +1557,7 @@ const MainApp = () => {
                     <option value="female" className="bg-zinc-900">Женский</option>
                   </select>
                 </div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Байк</label><input type="text" value={userData.bike || ''} onChange={e => setUserData({...userData, bike: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" placeholder="Yamaha R1" /></div>
                 {/* ВЕРНУЛ ПОЛЕ О СЕБЕ */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-600 uppercase">О себе</label>
@@ -1768,7 +1768,7 @@ const MainApp = () => {
                     placeholder="Описание события..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Дата</label>
                     <input 

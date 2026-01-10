@@ -85,6 +85,17 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
            const coords = u.coords || { x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 };
            
            let interests = u.interests;
+           
+           // Handle case where interests might be a JSON string
+           if (typeof interests === 'string') {
+             try {
+               interests = JSON.parse(interests);
+             } catch (e) {
+               console.error('Error parsing interests:', e);
+               interests = null;
+             }
+           }
+
            if (!interests || !Array.isArray(interests)) {
               interests = [
                 { id: 'style', label: 'Стиль', value: u.temp || 'Спорт', icon: 'Gauge' },
@@ -107,7 +118,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
              ...u,
              coords,
              images: u.images || (u.image ? [u.image] : []),
-             interests: interestsWithIcons
+             interests: interestsWithIcons,
+             about: u.about // Ensure about is passed
            };
         });
       onUsersLoaded(filteredUsers);
