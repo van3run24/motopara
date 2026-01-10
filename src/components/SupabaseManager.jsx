@@ -160,8 +160,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
               ...m,
               sender: m.sender_id === userId ? 'me' : 'other'
             })) || [],
-            name: chat.participant_1_id === userId ? chat.participant_2.name : chat.participant_1.name,
-            image: chat.participant_1_id === userId ? chat.participant_2.image : chat.participant_1.image,
+            name: chat.participant_1_id === userId ? (chat.participant_2?.name || 'Неизвестный пользователь') : (chat.participant_1?.name || 'Неизвестный пользователь'),
+            image: chat.participant_1_id === userId ? (chat.participant_2?.image || null) : (chat.participant_1?.image || null),
             lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :

@@ -1228,19 +1228,25 @@ const MainApp = () => {
             <div className="h-20 shrink-0 border-b border-white/5 flex items-center px-6 gap-4 bg-black/80 backdrop-blur-xl">
               <button onClick={() => { setSelectedChat(null); setMessageInput(''); }} className="p-2 bg-white/5 rounded-xl active:scale-90 transition-all"><ChevronLeft size={20}/></button>
               <div className="flex items-center gap-3">
-                <img src={selectedChat.image} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
+                {selectedChat.image ? (
+                  <img src={selectedChat.image} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/10">
+                    <User size={20} className="text-zinc-500" />
+                  </div>
+                )}
                 <div>
-                <h4 className="font-bold text-sm uppercase italic">{selectedChat.name}</h4>
+                <h4 className="font-bold text-sm uppercase italic">{selectedChat.name || 'Пользователь'}</h4>
                   {selectedChat.online && <p className="text-[9px] text-green-500 font-bold uppercase">В сети</p>}
                 </div>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col italic font-medium scrollbar-hide">
-              {selectedChat.messages.length > 0 ? (
+              {selectedChat.messages && selectedChat.messages.length > 0 ? (
                 <>
-              {selectedChat.messages.map(msg => (
+              {selectedChat.messages.map((msg, idx) => (
                     <div 
-                        key={msg.id} 
+                        key={msg.id || idx} 
                         className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
                         onClick={() => {
                             if (msg.sender === 'me') {
@@ -1274,7 +1280,7 @@ const MainApp = () => {
                         />
                       ) : (
                         <div className={`p-4 rounded-[24px] text-sm cursor-pointer ${msg.sender === 'me' ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
-                          {msg.text}
+                          {msg.text || ''}
                           {msg.is_edited && <span className="text-[9px] opacity-60 ml-2 italic">(ред.)</span>}
                         </div>
                       )}
