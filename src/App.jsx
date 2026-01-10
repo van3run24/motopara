@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import AuthModal from './components/AuthModal';
 import MainApp from './components/MainApp';
 
+import { supabase } from './supabaseClient';
+
 function App() {
   // Логика для открытия/закрытия окна
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -10,10 +12,33 @@ function App() {
   const howItWorksRef = useRef(null);
 
   useEffect(() => {
+    // Проверка сессии при загрузке
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('userId', session.user.id);
+      }
+    });
+
+    // Подписка на изменения сессии
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('userId', session.user.id);
+      } else {
+        setIsLoggedIn(false);
+        localStorage.removeItem('userId');
+      }
+    });
+
     const cookiesAccepted = localStorage.getItem('cookiesAccepted');
     if (!cookiesAccepted) {
       setTimeout(() => setShowCookies(true), 1000);
     }
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Если залогинены — показываем основное приложение
@@ -27,8 +52,8 @@ function App() {
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Навигация */}
-      <nav className="fixed top-0 w-full z-50 backdrop-blur-2xl bg-black/40 border-b border-white/[0.05]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <nav className="fixed top-0 w-full z-50 backdrop-blur-2xl bg-black/40 border-b border-white/[0.05] px-4 md:px-0">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="text-xl font-bold tracking-tighter italic uppercase">
             МОТО<span className="text-orange-500 font-black">ЗНАКОМСТВА</span>
           </div>
@@ -42,7 +67,7 @@ function App() {
       </nav>
 
       {/* Hero Section */}
-      <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
+      <main className="relative pt-32 pb-20 px-4 md:px-6 max-w-6xl mx-auto scroll-smooth">
         <section className="text-center flex flex-col items-center">
           
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-[13px] font-medium text-zinc-400 mb-10 shadow-inner">
@@ -67,13 +92,13 @@ function App() {
           <div className="flex flex-col sm:flex-row gap-5 w-full justify-center items-center">
             <button 
               onClick={() => setIsAuthModalOpen(true)}
-              className="w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white px-12 py-5 rounded-[22px] font-bold text-lg shadow-[0_20px_40px_-15px_rgba(234,88,12,0.3)] transition-all hover:scale-[1.03] active:scale-[0.97]"
+              className="w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white px-12 py-5 rounded-[24px] font-bold text-lg shadow-[0_20px_40px_-15px_rgba(234,88,12,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Попробовать сейчас
             </button>
             <button 
               onClick={() => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth' })}
-              className="w-full sm:w-auto backdrop-blur-md bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.1] px-12 py-5 rounded-[22px] font-bold text-lg transition-all"
+              className="w-full sm:w-auto backdrop-blur-md bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.1] px-12 py-5 rounded-[24px] font-bold text-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Узнать больше
             </button>
