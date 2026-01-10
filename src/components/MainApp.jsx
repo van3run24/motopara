@@ -19,6 +19,24 @@ L.Icon.Default.mergeOptions({
 const MainApp = () => {
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
   const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
+  const [userLocation, setUserLocation] = useState(null);
+  const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
           const checkSession = async () => {
@@ -88,6 +106,7 @@ const MainApp = () => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [exitDirection, setExitDirection] = useState(null);
   const cardRef = useRef(null);
   const profileScrollRef = useRef(null); // Ref for resetting scroll
 
@@ -126,6 +145,51 @@ const MainApp = () => {
     }
     return [];
   });
+
+  // Sync selectedChat with chats for real-time updates
+  useEffect(() => {
+    if (selectedChat) {
+      const updatedChat = chats.find(c => c.id === selectedChat.id);
+      if (updatedChat) {
+        // Preserve local state like scroll position if needed, but for now just update messages
+        // We only want to update if messages count changed or last message changed to avoid unnecessary re-renders
+        if (updatedChat.messages.length !== selectedChat.messages.length || 
+            updatedChat.lastMessage !== selectedChat.lastMessage ||
+            updatedChat.isPartnerTyping !== selectedChat.isPartnerTyping) {
+          setSelectedChat(prev => ({
+            ...prev,
+            ...updatedChat,
+            messages: updatedChat.messages
+          }));
+        }
+      }
+    }
+  }, [chats]);
+
+  // Subscribe to typing indicators
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+    
+    // Reset typing state when chat changes
+    setIsPartnerTyping(false);
+
+    const unsubscribe = window.supabaseManager.subscribeToTyping(selectedChat.id, (payload) => {
+      setIsPartnerTyping(true);
+      
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsPartnerTyping(false);
+      }, 3000);
+    });
+    
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [selectedChat?.id]);
 
   // Загрузка профиля пользователя из Supabase
   useEffect(() => {
@@ -202,32 +266,43 @@ const MainApp = () => {
 
   const handleNext = () => {
     if (filteredBikers.length > 0) {
-      setCurrentIndex((prev) => {
-        const nextIndex = (prev + 1) % filteredBikers.length;
-        return nextIndex >= 0 && nextIndex < filteredBikers.length ? nextIndex : 0;
-      });
-      setCurrentImageIndex(0);
-      setDragOffset({ x: 0, y: 0 });
-      // Reset scroll position
-      if (profileScrollRef.current) {
-        profileScrollRef.current.scrollTop = 0;
-      }
+      setExitDirection('left');
+      setTimeout(() => {
+          setCurrentIndex((prev) => prev + 1);
+          setCurrentImageIndex(0);
+          setDragOffset({ x: 0, y: 0 });
+          setExitDirection(null);
+          if (profileScrollRef.current) {
+            profileScrollRef.current.scrollTop = 0;
+          }
+      }, 300);
     }
   };
 
   const handleLike = async () => {
+    if (!currentBiker) return;
+    const likedUser = currentBiker;
+    
+    setExitDirection('right');
+    
+    setTimeout(() => {
+        setCurrentIndex((prev) => prev + 1);
+        setCurrentImageIndex(0);
+        setDragOffset({ x: 0, y: 0 });
+        setExitDirection(null);
+        if (profileScrollRef.current) profileScrollRef.current.scrollTop = 0;
+    }, 300);
+
     try {
-      // Используем SupabaseManager если есть подключение
-      if (window.supabaseManager && currentBiker.id) {
-        const result = await window.supabaseManager.recordLike(currentBiker.id);
+      if (window.supabaseManager && likedUser.id) {
+        const result = await window.supabaseManager.recordLike(likedUser.id);
         
         if (result.isMatch) {
-          // Мэтч! Показываем экран совпадения
           const newChat = result.chat;
           const chatData = {
             id: newChat.id,
-            name: currentBiker.name,
-            image: currentBiker.images[0],
+            name: likedUser.name,
+            image: likedUser.images[0] || DEFAULT_AVATAR,
             lastMessage: 'Новый мэтч!',
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
             online: true,
@@ -236,20 +311,13 @@ const MainApp = () => {
           };
           setChats(prev => [...prev, chatData]);
           
-          setMatchData(currentBiker);
+          setMatchData(likedUser);
           setHasNewMatchNotification(true);
-          setNewMatches(prev => [{...currentBiker, isNew: true}, ...prev]);
-        } else {
-          // Просто лайк, идем дальше
-          handleNext();
+          setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
         }
-      } else {
-        // Fallback если нет Supabase
-        handleNext();
       }
     } catch (err) {
       console.error('Error in handleLike:', err);
-      handleNext();
     }
   };
 
@@ -415,6 +483,13 @@ const MainApp = () => {
         if (isProfile && userId) {
           // Загрузка аватара в Supabase
           const imageUrl = await userService.uploadAvatar(userId, file);
+          
+          // Обновляем поле image в таблице users
+          await supabase
+            .from('users')
+            .update({ image: imageUrl })
+            .eq('id', userId);
+
           setUserData({...userData, image: imageUrl});
           // Добавляем в галерею, если еще нет
           if (!userImages.includes(imageUrl)) {
@@ -570,33 +645,56 @@ const MainApp = () => {
     }
   };
 
+  const handleEditMessage = (message) => {
+    setEditingMessage(message);
+    setMessageInput(message.text);
+    setContextMenuMessageId(null);
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (window.confirm('Удалить сообщение?')) {
+      try {
+        await window.supabaseManager.deleteMessage(messageId);
+        // Remove from local state immediately
+        if (selectedChat) {
+          const updatedMessages = selectedChat.messages.filter(m => m.id !== messageId);
+          const updatedChat = { ...selectedChat, messages: updatedMessages };
+          setSelectedChat(updatedChat);
+          setChats(prevChats => prevChats.map(c => c.id === selectedChat.id ? updatedChat : c));
+        }
+      } catch (e) {
+        console.error('Error deleting message:', e);
+      }
+    }
+    setContextMenuMessageId(null);
+  };
+
   const sendMessage = async () => {
     if (!messageInput.trim() || !selectedChat) return;
-    
+
     try {
-      // Используем SupabaseManager если есть подключение
-      if (window.supabaseManager && selectedChat.id) {
-        await window.supabaseManager.sendMessage(selectedChat.id, messageInput);
+      if (editingMessage) {
+        // Edit existing message
+        await window.supabaseManager.editMessage(editingMessage.id, messageInput.trim());
+        
+        // Optimistic update
+        const updatedMessages = selectedChat.messages.map(m => 
+          m.id === editingMessage.id ? { ...m, text: messageInput.trim(), is_edited: true } : m
+        );
+        const updatedChat = { ...selectedChat, messages: updatedMessages };
+        
+        setSelectedChat(updatedChat);
+        setChats(prevChats => prevChats.map(c => c.id === selectedChat.id ? updatedChat : c));
+        setEditingMessage(null);
+      } else {
+        // Send new message
+        if (window.supabaseManager) {
+          await window.supabaseManager.sendMessage(selectedChat.id, messageInput.trim());
+        }
       }
       
-      // Обновляем локальный state
-      const newMessage = {
-        id: Date.now(),
-        text: messageInput,
-        sender: 'me',
-        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      const updatedChat = {
-        ...selectedChat,
-        messages: [...(selectedChat.messages || []), newMessage],
-        lastMessage: messageInput,
-        time: newMessage.time
-      };
-      
-      setSelectedChat(updatedChat);
-      setChats(chats.map(c => c.id === selectedChat.id ? updatedChat : c));
       setMessageInput('');
+      setShowEmojiPicker(false);
       
       // Прокрутка к новому сообщению
       setTimeout(() => {
@@ -610,19 +708,12 @@ const MainApp = () => {
   };
 
 
-  // Автоскролл к последнему сообщению
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedChat?.messages]);
 
-  const handleMessageKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
 
   if (isSplashing) {
     return (
@@ -662,12 +753,14 @@ const MainApp = () => {
     <div className="fixed inset-0 bg-black text-white flex flex-col overflow-hidden font-sans animate-in fade-in duration-500">
       
       {/* Supabase Manager - работает в фоне */}
-      <SupabaseManager 
-        userData={userData}
-        onUsersLoaded={setBikers}
-        onChatsLoaded={setChats}
-        onEventsLoaded={setEvents}
-      />
+      {userData && (
+        <SupabaseManager 
+          userData={userData}
+          onUsersLoaded={setBikers}
+          onChatsLoaded={setChats}
+          onEventsLoaded={setEvents}
+        />
+      )}
       
       {!selectedChat && (
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
@@ -691,8 +784,11 @@ const MainApp = () => {
                     isDragging ? 'cursor-grabbing' : 'cursor-grab'
                   } select-none`}
                   style={{
-                    transform: `translateX(${dragOffset.x}px) rotate(${dragOffset.x * 0.1}deg)`,
-                    opacity: isDragging ? 1 - Math.abs(dragOffset.x) / 500 : 1,
+                    transform: exitDirection 
+                        ? `translateX(${exitDirection === 'right' ? 1000 : -1000}px) rotate(${exitDirection === 'right' ? 20 : -20}deg)`
+                        : `translateX(${dragOffset.x}px) rotate(${dragOffset.x * 0.1}deg)`,
+                    opacity: exitDirection ? 0 : (isDragging ? 1 - Math.abs(dragOffset.x) / 500 : 1),
+                    transition: exitDirection ? 'transform 0.3s ease-in-out, opacity 0.3s ease-in-out' : 'none'
                   }}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
@@ -768,9 +864,9 @@ const MainApp = () => {
                         <div className="flex items-center justify-between">
                           <h4 className="text-xl font-black uppercase italic text-white">О себе</h4>
                         </div>
-                        <p className="text-lg text-zinc-200 leading-relaxed font-light italic">"{currentBiker.about}"</p>
+                        <p className="text-lg text-zinc-200 leading-relaxed font-light italic">"{currentBiker.about || 'Пользователь не указал информацию о себе'}"</p>
                         <div className="grid grid-cols-2 gap-3">
-                          {currentBiker.interests.map((item, idx) => (
+                          {currentBiker.interests && currentBiker.interests.map((item, idx) => (
                             <div key={idx} className="bg-white/[0.05] backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col gap-1">
                               <div className="text-zinc-300 flex items-center gap-2 mb-1">{item.icon}<span className="text-[9px] uppercase font-bold tracking-tighter">{item.label}</span></div>
                               <span className="text-sm font-semibold text-white/90">{item.value}</span>
@@ -803,12 +899,12 @@ const MainApp = () => {
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <Search size={48} className="text-zinc-800 mb-4" />
                 <p className="text-zinc-600 text-sm italic uppercase tracking-wider mb-2">
-                  {filteredBikers.length === 0 ? 'Анкеты закончились' : 'Нет анкет в этом городе'}
+                  {filteredBikers.length === 0 ? 'Нет анкет в этом городе' : 'Анкеты закончились'}
                 </p>
                 <p className="text-zinc-700 text-xs">
                   {filteredBikers.length === 0 
-                    ? 'Попробуйте изменить город или зайдите позже' 
-                    : 'Попробуйте изменить город в настройках'
+                    ? 'Попробуйте изменить город в настройках' 
+                    : 'Зайдите позже, появятся новые'
                   }
                 </p>
               </div>
@@ -823,7 +919,7 @@ const MainApp = () => {
             <div className="relative bg-[#0a0a0a] mx-4 mt-4 rounded-[32px] border border-white/10 overflow-hidden" style={{ height: '40vh', minHeight: '300px' }}>
               {userData && (
                 <MapContainer 
-                  center={[
+                  center={userLocation ? [userLocation.lat, userLocation.lng] : [
                     cities.find(c => c.name === userData.city)?.lat || 55.7558, 
                     cities.find(c => c.name === userData.city)?.lng || 37.6173
                   ]} 
@@ -837,7 +933,7 @@ const MainApp = () => {
                     attribution=""
                   />
                   {/* User Marker */}
-                   <Marker position={[
+                   <Marker position={userLocation ? [userLocation.lat, userLocation.lng] : [
                     cities.find(c => c.name === userData.city)?.lat || 55.7558, 
                     cities.find(c => c.name === userData.city)?.lng || 37.6173
                    ]}>
@@ -859,7 +955,7 @@ const MainApp = () => {
                           <Popup className="custom-popup">
                             <div className="w-48 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10 flex flex-col">
                                <div className="h-32 w-full relative shrink-0">
-                                  <img src={b.images[0]} className="w-full h-full object-cover" alt={b.name}/>
+                                  <img src={b.images[0] || DEFAULT_AVATAR} className="w-full h-full object-cover" alt={b.name}/>
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
                                   <div className="absolute bottom-2 left-3">
                                      <span className="font-black italic uppercase text-lg leading-none block">{b.name}, {b.age}</span>
@@ -880,7 +976,7 @@ const MainApp = () => {
                 </MapContainer>
               )}
               
-              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[1000]">
+              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
                 <Navigation className="text-orange-500" size={18} />
                 <div>
                   <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
@@ -1143,16 +1239,43 @@ const MainApp = () => {
               {selectedChat.messages.length > 0 ? (
                 <>
               {selectedChat.messages.map(msg => (
-                    <div key={msg.id} className={`max-w-[85%] ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}>
+                    <div 
+                        key={msg.id} 
+                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
+                        onClick={() => {
+                            if (msg.sender === 'me') {
+                                setContextMenuMessageId(contextMenuMessageId === msg.id ? null : msg.id);
+                            }
+                        }}
+                    >
+                      {/* Context Menu for Edit/Delete */}
+                      {contextMenuMessageId === msg.id && msg.sender === 'me' && (
+                          <div className="absolute bottom-full right-0 mb-2 bg-[#1c1c1e] border border-white/10 rounded-xl p-2 shadow-2xl z-50 flex flex-col gap-1 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); handleEditMessage(msg); }}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-white/10 rounded-lg text-sm text-zinc-200 transition-colors text-left"
+                              >
+                                  <Edit3 size={14} /> Редактировать
+                              </button>
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-red-500/20 text-red-500 rounded-lg text-sm transition-colors text-left"
+                              >
+                                  <Trash2 size={14} /> Удалить
+                              </button>
+                          </div>
+                      )}
+
                       {msg.type === 'image' ? (
                         <img 
                           src={msg.image} 
                           alt="Sent" 
-                          className={`rounded-[24px] ${msg.sender === 'me' ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto`}
+                          className={`rounded-[24px] ${msg.sender === 'me' ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto cursor-pointer active:opacity-80 transition-opacity`}
                         />
                       ) : (
-                        <div className={`p-4 rounded-[24px] text-sm ${msg.sender === 'me' ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
+                        <div className={`p-4 rounded-[24px] text-sm cursor-pointer ${msg.sender === 'me' ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
                           {msg.text}
+                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-2 italic">(ред.)</span>}
                         </div>
                       )}
                     </div>
@@ -1167,7 +1290,7 @@ const MainApp = () => {
             </div>
             
             {/* Индикатор печатания */}
-            {isTyping && (
+            {isPartnerTyping && (
               <div className="px-6 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
@@ -1219,20 +1342,17 @@ const MainApp = () => {
               >
                 <Camera size={20} />
               </button>
-              <input 
-                type="text" 
+              <textarea 
                 placeholder="Сообщение..." 
                 value={messageInput}
                 onChange={(e) => {
                   setMessageInput(e.target.value);
-                  // Имитация анимации печатания
-                  if (e.target.value.length > 0 && !isTyping) {
-                    setIsTyping(true);
-                    setTimeout(() => setIsTyping(false), 1000);
+                  if (e.target.value.length > 0 && selectedChat && window.supabaseManager) {
+                     window.supabaseManager.sendTyping(selectedChat.id);
                   }
                 }}
-                onKeyPress={handleMessageKeyPress}
-                className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500/50 transition-colors" 
+                className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[56px] max-h-32" 
+                rows={1}
               />
               <button 
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -1442,7 +1562,7 @@ const MainApp = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-600 uppercase">О себе</label>
                   <textarea 
-                    value={userData.about} 
+                    value={userData.about || ''} 
                     onChange={e => setUserData({...userData, about: e.target.value})} 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-orange-500 resize-none italic text-sm"
                   />
@@ -1467,11 +1587,47 @@ const MainApp = () => {
                 </div>
               </div>
               <button 
-                onClick={() => {
-                  setShowSettings(false);
-                  // Обновляем текущий индекс, если текущий байкер не из нового города
-                  if (currentBiker && currentBiker.city !== userData.city) {
-                    setCurrentIndex(0);
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('users')
+                      .update({
+                        name: userData.name,
+                        age: userData.age,
+                        city: userData.city,
+                        bike: userData.bike,
+                        gender: userData.gender,
+                        about: userData.about,
+                        temp: userData.temp,
+                        music: userData.music,
+                        equip: userData.equip,
+                        goal: userData.goal,
+                        interests: [
+                            { id: 'style', label: 'Стиль', value: userData.temp || 'Спорт', icon: 'Gauge' },
+                            { id: 'music', label: 'Музыка', value: userData.music || 'Rock', icon: 'Music' },
+                            { id: 'equip', label: 'Экип', value: userData.equip || 'Full', icon: 'Shield' },
+                            { id: 'goal', label: 'Цель', value: userData.goal || 'Катка', icon: 'Target' }
+                        ]
+                      })
+                      .eq('id', userData.id);
+
+                    if (error) throw error;
+                    
+                    alert('Профиль успешно сохранен!');
+                    setShowSettings(false);
+                    
+                    // Обновляем текущий индекс, если текущий байкер не из нового города
+                    if (currentBiker && currentBiker.city !== userData.city) {
+                        setCurrentIndex(0);
+                    }
+                    
+                    // Reload users to reflect changes if needed
+                    if (window.supabaseManager && window.supabaseManager.loadUsers) {
+                        window.supabaseManager.loadUsers();
+                    }
+                  } catch (err) {
+                    console.error('Error saving profile:', err);
+                    alert('Ошибка при сохранении профиля: ' + err.message);
                   }
                 }} 
                 className="w-full bg-orange-600 p-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
@@ -1564,9 +1720,9 @@ const MainApp = () => {
           <div className="absolute inset-0 z-[200] bg-black/90 backdrop-blur-3xl flex flex-col items-center justify-center p-6 animate-in zoom-in">
             <h2 className="text-5xl font-black italic uppercase tracking-tighter text-orange-500 animate-bounce mb-12 text-center">Это<br/>Мэтч!</h2>
             <div className="flex gap-4 mb-16 relative">
-              <img src={userData.image || ''} className="w-32 h-32 rounded-[32px] border-4 border-white -rotate-12" alt="" />
+              <img src={userData.image || DEFAULT_AVATAR} className="w-32 h-32 rounded-[32px] border-4 border-white -rotate-12 object-cover" style={{ objectFit: 'cover' }} alt="" />
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-orange-600 p-4 rounded-full z-10 animate-pulse"><Heart fill="white" size={32}/></div>
-              <img src={matchData.images[0]} className="w-32 h-32 rounded-[32px] border-4 border-white rotate-12" alt="" />
+              <img src={matchData.images[0] || DEFAULT_AVATAR} className="w-32 h-32 rounded-[32px] border-4 border-white rotate-12 object-cover" style={{ objectFit: 'cover' }} alt="" />
             </div>
             <div className="w-full max-w-xs space-y-4">
               <button onClick={() => { 
@@ -1666,14 +1822,48 @@ const MainApp = () => {
 
       <nav className="h-24 shrink-0 flex items-start justify-center px-4 relative z-40">
         <div className="w-full max-w-sm h-16 bg-[#1c1c1e]/90 backdrop-blur-3xl border border-white/10 rounded-[32px] flex items-center justify-around shadow-2xl">
-              <button onClick={() => {setActiveTab('search'); setSelectedChat(null); setMatchData(null); setSwipedChatId(null); setShowSettings(false); setCardExpanded(false);}} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'search' ? 'text-orange-500' : 'text-zinc-600'}`}><Search size={22}/><span className="text-[9px] font-black uppercase">Поиск</span></button>
-          <button onClick={() => {setActiveTab('map'); setSelectedChat(null); setSwipedChatId(null); setShowSettings(false); setCardExpanded(false);}} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'map' ? 'text-orange-500' : 'text-zinc-600'}`}><MapPin size={22}/><span className="text-[9px] font-black uppercase">Карта</span></button>
-          <button onClick={() => {setActiveTab('chats'); setSelectedChat(null); setHasNewMatchNotification(false); setSwipedChatId(null); setShowSettings(false); setCardExpanded(false);}} className={`flex flex-col items-center gap-1 relative transition-colors active:scale-95 ${activeTab === 'chats' ? 'text-orange-500' : 'text-zinc-600'}`}>
+              <button onClick={() => {
+                setActiveTab('search'); 
+                setSelectedChat(null); 
+                setMatchData(null); 
+                setSwipedChatId(null); 
+                setShowSettings(false); 
+                setShowAppSettings(false); 
+                setNewEvent({ title: '', description: '', date: '', time: '', address: '', link: '' });
+                setShowEventModal(false);
+              }} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'search' ? 'text-orange-500' : 'text-zinc-600'}`}><Search size={22}/><span className="text-[9px] font-black uppercase">Поиск</span></button>
+          <button onClick={() => {
+                setActiveTab('map'); 
+                setSelectedChat(null); 
+                setMatchData(null); 
+                setSwipedChatId(null); 
+                setShowSettings(false); 
+                setShowAppSettings(false); 
+                setShowEventModal(false);
+              }} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'map' ? 'text-orange-500' : 'text-zinc-600'}`}><MapPin size={22}/><span className="text-[9px] font-black uppercase">Карта</span></button>
+          <button onClick={() => {
+                setActiveTab('chats'); 
+                setSelectedChat(null); 
+                setMatchData(null); 
+                setHasNewMatchNotification(false); 
+                setSwipedChatId(null); 
+                setShowSettings(false); 
+                setShowAppSettings(false); 
+                setShowEventModal(false);
+              }} className={`flex flex-col items-center gap-1 relative transition-colors active:scale-95 ${activeTab === 'chats' ? 'text-orange-500' : 'text-zinc-600'}`}>
               <MessageCircle size={22}/>
               <span className="text-[9px] font-black uppercase">Чаты</span>
               {hasNewMatchNotification && <div className="absolute top-0 right-1 w-2 h-2 bg-orange-600 rounded-full border-2 border-[#1c1c1e]" />}
           </button>
-          <button onClick={() => {setActiveTab('profile'); setSwipedChatId(null); setCardExpanded(false);}} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-600'}`}><User size={22}/><span className="text-[9px] font-black uppercase">Профиль</span></button>
+          <button onClick={() => {
+                setActiveTab('profile'); 
+                setSelectedChat(null); 
+                setMatchData(null); 
+                setSwipedChatId(null); 
+                setShowSettings(false); 
+                setShowAppSettings(false); 
+                setShowEventModal(false);
+              }} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-600'}`}><User size={22}/><span className="text-[9px] font-black uppercase">Профиль</span></button>
       </div>
     </nav>
       {/* Стили для скрытия скроллбара */}

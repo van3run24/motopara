@@ -5,6 +5,7 @@ import { Gauge, Music, Shield, Target } from 'lucide-react';
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const typingChannelsRef = React.useRef({});
 
   // Получение геолокации пользователя
   const getUserLocation = () => {
@@ -58,6 +59,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
   // Загрузка пользователей для поиска
   const loadUsers = async () => {
+    if (!userData) return;
     try {
       const { data: users, error } = await supabase
         .from('users')
@@ -142,7 +144,10 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           
           return {
             ...chat,
-            messages: messages || [],
+            messages: messages?.map(m => ({
+              ...m,
+              sender: m.sender_id === userId ? 'me' : 'other'
+            })) || [],
             name: chat.participant_1_id === userId ? chat.participant_2.name : chat.participant_1.name,
             image: chat.participant_1_id === userId ? chat.participant_2.image : chat.participant_1.image,
             lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
@@ -210,12 +215,12 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       .channel('messages')
       .on('postgres_changes', 
         { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'messages'
         }, 
         (payload) => {
-          console.log('New message:', payload);
+          console.log('Message update:', payload);
           loadChats();
         }
       )
@@ -323,10 +328,60 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       if (error) throw error;
       return data;
     },
+    deleteMessage: async (messageId) => {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+      if (error) throw error;
+    },
+    editMessage: async (messageId, newText) => {
+      const { error } = await supabase
+        .from('messages')
+        .update({ text: newText, is_edited: true })
+        .eq('id', messageId);
+      if (error) throw error;
+    },
     updateUserLocation,
     loadUsers,
     loadChats,
     loadEvents,
+    sendTyping: async (chatId) => {
+      const userId = localStorage.getItem('userId');
+      let channel = typingChannelsRef.current[chatId];
+      
+      if (!channel) {
+          channel = supabase.channel(`typing:${chatId}`);
+          typingChannelsRef.current[chatId] = channel;
+          await channel.subscribe();
+      }
+
+      await channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId, chatId }
+      });
+    },
+    subscribeToTyping: (chatId, callback) => {
+      let channel = typingChannelsRef.current[chatId];
+      
+      if (!channel) {
+          channel = supabase.channel(`typing:${chatId}`);
+          typingChannelsRef.current[chatId] = channel;
+          channel.subscribe();
+      }
+      
+      channel.on('broadcast', { event: 'typing' }, (payload) => {
+          if (payload.payload.userId !== localStorage.getItem('userId')) {
+            callback(payload.payload);
+          }
+      });
+      
+      return () => {
+          supabase.removeChannel(channel);
+          delete typingChannelsRef.current[chatId];
+      };
+    },
     // Тестовая функция для заполнения базы
     seedDatabase: async () => {
       const demoUsers = [
