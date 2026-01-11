@@ -837,7 +837,7 @@ const MainApp = () => {
                         <h3 className="text-4xl font-black tracking-tight uppercase italic text-white drop-shadow-2xl mb-2">{currentBiker.name}, {currentBiker.age}</h3>
                         <div className="flex items-center gap-2">
                           <Zap size={16} className="text-orange-500 fill-orange-500 drop-shadow-2xl" />
-                          <p className="text-orange-500 text-sm font-bold uppercase tracking-widest drop-shadow-2xl">{currentBiker.bike}</p>
+                          <p className="text-orange-500 text-sm font-bold uppercase tracking-widest drop-shadow-2xl">{currentBiker.has_bike ? currentBiker.bike : "Ищу того, кто прокатит"}</p>
                         </div>
                       </div>
 
@@ -963,7 +963,7 @@ const MainApp = () => {
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
                                   <div className="absolute bottom-2 left-3">
                                      <span className="font-black italic uppercase text-lg leading-none block">{b.name}, {b.age}</span>
-                                     <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{b.bike}</span>
+                                     <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{b.has_bike ? b.bike : "Ищу того, кто прокатит"}</span>
                                   </div>
                                </div>
                                <button 
@@ -1283,9 +1283,9 @@ const MainApp = () => {
                           className={`rounded-[24px] ${msg.sender === 'me' ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto cursor-pointer active:opacity-80 transition-opacity`}
                         />
                       ) : (
-                        <div className={`p-4 rounded-[24px] text-sm cursor-pointer ${msg.sender === 'me' ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
+                        <div className={`p-4 rounded-[24px] text-sm cursor-pointer border ${msg.sender === 'me' ? 'bg-[#ff9500]/10 border-[#ff9500]/20 text-white rounded-tr-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-tl-none'}`}>
                           {msg.text || ''}
-                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-2 italic">(ред.)</span>}
+                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-2">(ред.)</span>}
                         </div>
                       )}
                     </div>
@@ -1294,7 +1294,7 @@ const MainApp = () => {
                 </>
               ) : (
                 <div className="flex-1 flex items-center justify-center">
-                  <p className="text-zinc-600 text-sm italic">Начните общение первым!</p>
+                  <p className="text-zinc-600 text-sm">Начните общение первым!</p>
                 </div>
               )}
             </div>
@@ -1308,7 +1308,7 @@ const MainApp = () => {
                     <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                     <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                  <span className="text-zinc-500 text-xs italic">Собеседник печатает...</span>
+                  <span className="text-zinc-500 text-xs">Собеседник печатает...</span>
                 </div>
               </div>
             )}
@@ -1338,7 +1338,7 @@ const MainApp = () => {
               </div>
             )}
             
-            <div className="p-6 bg-black border-t border-white/5 flex gap-3">
+            <div className="p-4 bg-black border-t border-white/5 flex gap-2 items-end">
               <input 
                 type="file" 
                 ref={chatFileInputRef}
@@ -1348,9 +1348,9 @@ const MainApp = () => {
               />
               <button
                 onClick={() => chatFileInputRef.current?.click()}
-                className="bg-white/5 w-14 h-14 rounded-2xl flex items-center justify-center text-white active:scale-95 transition-all"
+                className="bg-white/5 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all mb-1"
               >
-                <Camera size={20} />
+                <Camera size={18} />
               </button>
               <textarea 
                 placeholder="Сообщение..." 
@@ -1361,21 +1361,26 @@ const MainApp = () => {
                      window.supabaseManager.sendTyping(selectedChat.id);
                   }
                 }}
-                className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[56px] max-h-32" 
+                className="flex-1 bg-white/5 border border-white/10 rounded-[20px] px-4 py-2.5 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[42px] max-h-32 leading-relaxed" 
                 rows={1}
+                style={{ height: 'auto' }}
+                onInput={(e) => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
               />
               <button 
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="bg-white/5 w-14 h-14 rounded-2xl flex items-center justify-center text-white active:scale-95 transition-all relative"
+                className="bg-white/5 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all mb-1 relative"
               >
-                <Smile size={20} />
+                <Smile size={18} />
               </button>
               <button 
                 onClick={sendMessage}
                 disabled={!messageInput.trim()}
-                className="bg-orange-600 w-14 h-14 rounded-2xl flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                className="bg-orange-600 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all mb-1"
               >
-                <Send size={20} />
+                <Send size={18} />
               </button>
             </div>
           </div>
@@ -1408,10 +1413,10 @@ const MainApp = () => {
             </div>
             <h2 className="text-2xl font-black uppercase italic mb-2">{userData.name}</h2>
             <p className="text-zinc-600 text-xs font-bold uppercase tracking-[0.2em] mb-2">{userData.city}</p>
-            {userData.bike && (
+            {(userData.bike || !userData.has_bike) && (
               <div className="flex items-center gap-2 mb-12">
                 <Zap size={14} className="text-orange-500 fill-orange-500" />
-                <p className="text-orange-500 text-xs font-bold uppercase tracking-widest">{userData.bike}</p>
+                <p className="text-orange-500 text-xs font-bold uppercase tracking-widest">{userData.has_bike ? userData.bike : "Ищу того, кто прокатит"}</p>
               </div>
             )}
             
@@ -1567,32 +1572,88 @@ const MainApp = () => {
                     <option value="female" className="bg-zinc-900">Женский</option>
                   </select>
                 </div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Байк</label><input type="text" value={userData.bike || ''} onChange={e => setUserData({...userData, bike: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" placeholder="Yamaha R1" /></div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase">Байк</label>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3 mb-2">
+                       <button 
+                         onClick={() => setUserData({...userData, has_bike: true})}
+                         className={`flex-1 py-3 rounded-xl border transition-all ${userData.has_bike ? 'bg-orange-500 border-orange-500 text-white font-bold' : 'bg-white/5 border-white/10 text-zinc-400'}`}
+                       >
+                         Есть байк
+                       </button>
+                       <button 
+                         onClick={() => setUserData({...userData, has_bike: false, bike: ''})}
+                         className={`flex-1 py-3 rounded-xl border transition-all ${!userData.has_bike ? 'bg-orange-500 border-orange-500 text-white font-bold' : 'bg-white/5 border-white/10 text-zinc-400'}`}
+                       >
+                         Нет байка
+                       </button>
+                    </div>
+                    {userData.has_bike && (
+                      <input 
+                        type="text" 
+                        value={userData.bike || ''} 
+                        onChange={e => setUserData({...userData, bike: e.target.value})} 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500 animate-in fade-in slide-in-from-top-2" 
+                        placeholder="Yamaha R1" 
+                      />
+                    )}
+                  </div>
+                </div>
                 {/* ВЕРНУЛ ПОЛЕ О СЕБЕ */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-600 uppercase">О себе</label>
                   <textarea 
                     value={userData.about || ''} 
                     onChange={e => setUserData({...userData, about: e.target.value})} 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-orange-500 resize-none italic text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-orange-500 resize-none text-sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Темп</label>
-                    <input type="text" value={userData.temp} onChange={e => setUserData({...userData, temp: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500" placeholder="Динамичный" />
+                    <select 
+                        value={userData.temp || 'Спокойный'} 
+                        onChange={e => setUserData({...userData, temp: e.target.value})} 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                    >
+                        <option value="Спокойный" className="bg-zinc-900">Спокойный</option>
+                        <option value="Динамичный" className="bg-zinc-900">Динамичный</option>
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Музыка</label>
-                    <input type="text" value={userData.music} onChange={e => setUserData({...userData, music: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500" placeholder="Rock" />
+                    <select 
+                        value={userData.music || 'Rock'} 
+                        onChange={e => setUserData({...userData, music: e.target.value})} 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                    >
+                        {['Rock', 'Pop', 'Rap', 'Techno', 'Chanson', 'Jazz', 'Metal', 'Classical'].map(genre => (
+                            <option key={genre} value={genre} className="bg-zinc-900">{genre}</option>
+                        ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Экип</label>
-                    <input type="text" value={userData.equip} onChange={e => setUserData({...userData, equip: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500" placeholder="Full Leather" />
+                    <select 
+                        value={userData.equip || 'Только шлем'} 
+                        onChange={e => setUserData({...userData, equip: e.target.value})} 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                    >
+                        <option value="Только шлем" className="bg-zinc-900">Только шлем</option>
+                        <option value="Полный" className="bg-zinc-900">Полный</option>
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Цель</label>
-                    <input type="text" value={userData.goal} onChange={e => setUserData({...userData, goal: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500" placeholder="Покатушки" />
+                    <select 
+                        value={userData.goal || 'Покатушки'} 
+                        onChange={e => setUserData({...userData, goal: e.target.value})} 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                    >
+                        <option value="Покатушки" className="bg-zinc-900">Покатушки</option>
+                        <option value="Любовный интерес" className="bg-zinc-900">Любовный интерес</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1778,8 +1839,8 @@ const MainApp = () => {
                     placeholder="Описание события..."
                   />
                 </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex-1">
                     <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Дата</label>
                     <input 
                       type="date" 
@@ -1788,7 +1849,7 @@ const MainApp = () => {
                       className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
                     />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Время</label>
                     <input 
                       type="time" 
