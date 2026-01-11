@@ -785,7 +785,7 @@ const MainApp = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex flex-col overflow-hidden font-sans animate-in fade-in duration-500">
+    <div className="fixed top-0 left-0 w-full h-full supports-[height:100dvh]:h-[100dvh] bg-black text-white flex flex-col overflow-hidden font-sans animate-in fade-in duration-500">
       
       {/* Supabase Manager - работает в фоне */}
       {userData && (
@@ -797,7 +797,7 @@ const MainApp = () => {
         />
       )}
       
-      {!selectedChat && (
+      {!selectedChat && !viewingProfile && (
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
           <div className="text-lg font-black tracking-tighter italic uppercase">Мото<span className="text-orange-500">Знакомства</span></div>
           <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
@@ -1074,13 +1074,11 @@ const MainApp = () => {
                     <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500 uppercase">
                       {event.date && (
                         <div className="flex items-center gap-1">
-                          <Calendar size={12} />
                           <span>{event.date}</span>
                         </div>
                       )}
                       {event.time && (
                         <div className="flex items-center gap-1">
-                          <Clock size={12} />
                           <span>{event.time}</span>
                         </div>
                       )}
@@ -2020,7 +2018,7 @@ const MainApp = () => {
         )}
       </main>
 
-      <nav className="h-24 shrink-0 flex items-start justify-center px-4 relative z-40">
+      <nav className="h-24 shrink-0 flex items-start justify-center px-4 relative z-50">
         <div className="w-full max-w-sm h-16 bg-[#1c1c1e]/90 backdrop-blur-3xl border border-white/10 rounded-[32px] flex items-center justify-around shadow-2xl">
               <button onClick={() => {
                 setActiveTab('search'); 
