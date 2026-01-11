@@ -23,9 +23,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Large images (use optimized versions in /gallery/)
-event.jpg
-love.jpg
-night.jpg
-prohvat.jpg
