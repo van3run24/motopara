@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2 } from 'lucide-react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
@@ -1245,7 +1245,7 @@ const MainApp = () => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col italic font-medium scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col scrollbar-hide">
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
                 <>
               {selectedChat.messages.map((msg, idx) => (
@@ -1277,15 +1277,33 @@ const MainApp = () => {
                       )}
 
                       {msg.type === 'image' ? (
-                        <img 
-                          src={msg.image} 
-                          alt="Sent" 
-                          className={`rounded-[24px] ${msg.sender === 'me' ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto cursor-pointer active:opacity-80 transition-opacity`}
-                        />
+                        <div className="relative">
+                            <img 
+                              src={msg.image} 
+                              alt="Sent" 
+                              className={`rounded-2xl ${msg.sender === 'me' ? 'rounded-br-none' : 'rounded-bl-none'} max-w-full h-auto cursor-pointer active:opacity-80 transition-opacity`}
+                            />
+                            <div className={`absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md flex items-center gap-1`}>
+                                <span className="text-[9px] text-white/90 font-medium">
+                                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                </span>
+                                {msg.sender === 'me' && (
+                                    <CheckCheck size={10} className="text-white/90" />
+                                )}
+                            </div>
+                        </div>
                       ) : (
-                        <div className={`p-4 rounded-[24px] text-sm cursor-pointer border ${msg.sender === 'me' ? 'bg-[#ff9500]/10 border-[#ff9500]/20 text-white rounded-tr-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-tl-none'}`}>
-                          {msg.text || ''}
-                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-2">(ред.)</span>}
+                        <div className={`px-3 py-2 rounded-2xl text-sm border relative min-w-[60px] ${msg.sender === 'me' ? 'bg-[#ff9500]/10 border-[#ff9500]/20 text-white rounded-br-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-bl-none'}`}>
+                          <span className="leading-relaxed break-words whitespace-pre-wrap">{msg.text || ''}</span>
+                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-1">(ред.)</span>}
+                          <div className={`float-right ml-2 mt-1 flex items-center gap-1 select-none ${msg.sender === 'me' ? 'text-orange-500/60' : 'text-zinc-500'}`}>
+                             <span className="text-[9px] font-medium">
+                                {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                             </span>
+                             {msg.sender === 'me' && (
+                                <CheckCheck size={12} />
+                             )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1338,7 +1356,7 @@ const MainApp = () => {
               </div>
             )}
             
-            <div className="p-4 bg-black border-t border-white/5 flex gap-2 items-end">
+            <div className="p-3 bg-black border-t border-white/5 flex gap-2 items-end">
               <input 
                 type="file" 
                 ref={chatFileInputRef}
@@ -1348,7 +1366,7 @@ const MainApp = () => {
               />
               <button
                 onClick={() => chatFileInputRef.current?.click()}
-                className="bg-white/5 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all mb-1"
+                className="bg-white/5 w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all"
               >
                 <Camera size={18} />
               </button>
@@ -1361,7 +1379,7 @@ const MainApp = () => {
                      window.supabaseManager.sendTyping(selectedChat.id);
                   }
                 }}
-                className="flex-1 bg-white/5 border border-white/10 rounded-[20px] px-4 py-2.5 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[42px] max-h-32 leading-relaxed" 
+                className="flex-1 bg-white/5 border border-white/10 rounded-[18px] px-4 py-2 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[36px] max-h-32 leading-relaxed" 
                 rows={1}
                 style={{ height: 'auto' }}
                 onInput={(e) => {
@@ -1371,16 +1389,16 @@ const MainApp = () => {
               />
               <button 
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="bg-white/5 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all mb-1 relative"
+                className="bg-white/5 w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all relative"
               >
                 <Smile size={18} />
               </button>
               <button 
                 onClick={sendMessage}
                 disabled={!messageInput.trim()}
-                className="bg-orange-600 w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all mb-1"
+                className="bg-orange-600 w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
               >
-                <Send size={18} />
+                <Send size={16} />
               </button>
             </div>
           </div>
