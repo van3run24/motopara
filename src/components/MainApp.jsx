@@ -438,6 +438,11 @@ const MainApp = () => {
     setChats(updatedChats);
     // Убираем из новых мэтчей
     setNewMatches(prev => prev.map(m => m.id === chat.id || m.name === chat.name ? {...m, isNew: false} : m));
+    
+    // Mark as read in backend
+    if (window.supabaseManager?.markAsRead) {
+      window.supabaseManager.markAsRead(chat.id);
+    }
   };
 
   const deleteChat = (chatId) => {
@@ -748,6 +753,30 @@ const MainApp = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedChat?.messages]);
+
+  // Sync selectedChat with chats updates (real-time)
+  useEffect(() => {
+    if (selectedChat && chats.length > 0) {
+      const updatedChat = chats.find(c => c.id === selectedChat.id);
+      if (updatedChat) {
+        // Check if messages changed (new message arrived)
+        const messagesChanged = JSON.stringify(updatedChat.messages) !== JSON.stringify(selectedChat.messages);
+        
+        if (messagesChanged) {
+           setSelectedChat(prev => ({
+             ...updatedChat,
+             // Preserve local state if needed, but usually we want fresh data
+           }));
+           
+           // If new messages arrived while chat is open, mark them as read
+           const hasUnread = updatedChat.messages.some(m => !m.is_read && m.sender === 'other');
+           if (hasUnread && window.supabaseManager?.markAsRead) {
+              window.supabaseManager.markAsRead(updatedChat.id);
+           }
+        }
+      }
+    }
+  }, [chats]);
 
 
   if (isSplashing) {
@@ -1084,7 +1113,6 @@ const MainApp = () => {
                       )}
                       {event.address && (
                         <div className="flex items-center gap-1">
-                          <MapPinIcon size={12} />
                           <span>{event.address}</span>
                         </div>
                       )}

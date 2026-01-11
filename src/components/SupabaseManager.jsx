@@ -180,7 +180,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
-              ''
+              '',
+            unreadCount: messages?.filter(m => m.sender_id !== userId && !m.is_read).length || 0
           };
         })
       );
@@ -362,6 +363,21 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .delete()
         .eq('id', messageId);
       if (error) throw error;
+    },
+    markAsRead: async (chatId) => {
+      const userId = localStorage.getItem('userId');
+      const { error } = await supabase.rpc('mark_messages_read', { p_chat_id: chatId });
+      
+      // Fallback if RPC fails (e.g. not created yet), try direct update (might fail due to RLS)
+      if (error) {
+          console.warn('RPC mark_messages_read failed, trying direct update:', error);
+          await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .eq('chat_id', chatId)
+            .neq('sender_id', userId)
+            .eq('is_read', false);
+      }
     },
     editMessage: async (messageId, newText) => {
       const { error } = await supabase

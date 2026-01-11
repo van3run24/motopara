@@ -35,6 +35,27 @@ DROP POLICY IF EXISTS "Users can delete their own messages" ON public.messages;
 CREATE POLICY "Users can delete their own messages" ON public.messages
 FOR DELETE USING (auth.uid() = sender_id);
 
+-- ALLOW READ STATUS UPDATES (Safe RPC function)
+-- This function allows updating is_read status for messages in a chat where the user is a participant
+CREATE OR REPLACE FUNCTION mark_messages_read(p_chat_id bigint)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.messages
+  SET is_read = true
+  WHERE chat_id = p_chat_id
+  AND sender_id != auth.uid()
+  AND is_read = false
+  AND EXISTS (
+    SELECT 1 FROM public.chats
+    WHERE id = p_chat_id
+    AND (participant_1_id = auth.uid() OR participant_2_id = auth.uid())
+  );
+END;
+$$;
+
 -- USERS POLICIES
 DROP POLICY IF EXISTS "Public read access to users" ON public.users;
 CREATE POLICY "Public read access to users" ON public.users
