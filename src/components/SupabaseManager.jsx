@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Gauge, Music, Shield, Target } from 'lucide-react';
 
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const typingChannelsRef = React.useRef({});
+  const typingChannelsRef = useRef({});
 
   // Получение геолокации пользователя
   const getUserLocation = () => {
