@@ -366,17 +366,33 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     },
     markAsRead: async (chatId) => {
       const userId = localStorage.getItem('userId');
-      const { error } = await supabase.rpc('mark_messages_read', { p_chat_id: chatId });
+      console.log('Marking messages as read for chat:', chatId, 'user:', userId);
       
-      // Fallback if RPC fails (e.g. not created yet), try direct update (might fail due to RLS)
-      if (error) {
+      try {
+        // Try RPC function first
+        const { error } = await supabase.rpc('mark_messages_read', { p_chat_id: chatId });
+        
+        if (error) {
           console.warn('RPC mark_messages_read failed, trying direct update:', error);
-          await supabase
+          
+          // Fallback: direct update with the new policy
+          const { error: directError } = await supabase
             .from('messages')
             .update({ is_read: true })
             .eq('chat_id', chatId)
             .neq('sender_id', userId)
             .eq('is_read', false);
+            
+          if (directError) {
+            console.error('Direct update also failed:', directError);
+          } else {
+            console.log('Direct update succeeded');
+          }
+        } else {
+          console.log('RPC update succeeded');
+        }
+      } catch (err) {
+        console.error('markAsRead error:', err);
       }
     },
     editMessage: async (messageId, newText) => {

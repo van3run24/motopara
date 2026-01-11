@@ -451,7 +451,7 @@ const MainApp = () => {
     }
   };
 
-  const openChat = (chat) => {
+  const openChat = async (chat) => {
     setSelectedChat(chat);
     setActiveTab('chats');
     const updatedChats = chats.map(c => c.id === chat.id ? {...c, unreadCount: 0, isNew: false} : c);
@@ -461,7 +461,7 @@ const MainApp = () => {
     
     // Mark as read in backend
     if (window.supabaseManager?.markAsRead) {
-      window.supabaseManager.markAsRead(chat.id);
+      await window.supabaseManager.markAsRead(chat.id);
     }
   };
 
@@ -776,26 +776,28 @@ const MainApp = () => {
 
   // Sync selectedChat with chats updates (real-time)
   useEffect(() => {
-    if (selectedChat && chats.length > 0) {
-      const updatedChat = chats.find(c => c.id === selectedChat.id);
-      if (updatedChat) {
-        // Check if messages changed (new message arrived)
-        const messagesChanged = JSON.stringify(updatedChat.messages) !== JSON.stringify(selectedChat.messages);
-        
-        if (messagesChanged) {
-           setSelectedChat(prev => ({
-             ...updatedChat,
-             // Preserve local state if needed, but usually we want fresh data
-           }));
-           
-           // If new messages arrived while chat is open, mark them as read
-           const hasUnread = updatedChat.messages.some(m => !m.is_read && m.sender === 'other');
-           if (hasUnread && window.supabaseManager?.markAsRead) {
-              window.supabaseManager.markAsRead(updatedChat.id);
-           }
+    const syncSelectedChat = async () => {
+      if (selectedChat && chats.length > 0) {
+        const updatedChat = chats.find(c => c.id === selectedChat.id);
+        if (updatedChat) {
+          const messagesChanged = JSON.stringify(updatedChat.messages) !== JSON.stringify(selectedChat.messages);
+          
+          if (messagesChanged) {
+             setSelectedChat(prev => ({
+               ...updatedChat,
+               // Preserve local state if needed, but usually we want fresh data
+             }));
+             
+             // If new messages arrived while chat is open, mark them as read
+             const hasUnread = updatedChat.messages.some(m => !m.is_read && m.sender === 'other');
+             if (hasUnread && window.supabaseManager?.markAsRead) {
+                await window.supabaseManager.markAsRead(updatedChat.id);
+             }
+          }
         }
       }
-    }
+    };
+    syncSelectedChat();
   }, [chats]);
 
 
