@@ -1644,11 +1644,11 @@ const MainApp = () => {
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Музыка</label>
                     <select 
-                        value={userData.music || 'Rock'} 
+                        value={userData.music || 'Рок'} 
                         onChange={e => setUserData({...userData, music: e.target.value})} 
                         className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
                     >
-                        {['Rock', 'Pop', 'Rap', 'Techno', 'Chanson', 'Jazz', 'Metal', 'Classical'].map(genre => (
+                        {['Рок', 'Поп', 'Рэп', 'Техно', 'Шансон', 'Джаз', 'Метал', 'Классика'].map(genre => (
                             <option key={genre} value={genre} className="bg-zinc-900">{genre}</option>
                         ))}
                     </select>
@@ -1662,16 +1662,17 @@ const MainApp = () => {
                     >
                         <option value="Только шлем" className="bg-zinc-900">Только шлем</option>
                         <option value="Полный" className="bg-zinc-900">Полный</option>
+                        <option value="Нет экипировки" className="bg-zinc-900">Нет экипировки</option>
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-zinc-600 uppercase">Цель</label>
                     <select 
-                        value={userData.goal || 'Покатушки'} 
+                        value={userData.goal || 'Только поездки'} 
                         onChange={e => setUserData({...userData, goal: e.target.value})} 
                         className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
                     >
-                        <option value="Покатушки" className="bg-zinc-900">Покатушки</option>
+                        <option value="Только поездки" className="bg-zinc-900">Только поездки</option>
                         <option value="Любовный интерес" className="bg-zinc-900">Любовный интерес</option>
                     </select>
                   </div>
@@ -1694,10 +1695,10 @@ const MainApp = () => {
                         equip: userData.equip,
                         goal: userData.goal,
                         interests: [
-                            { id: 'style', label: 'Стиль', value: userData.temp || 'Спорт', icon: 'Gauge' },
-                            { id: 'music', label: 'Музыка', value: userData.music || 'Rock', icon: 'Music' },
-                            { id: 'equip', label: 'Экип', value: userData.equip || 'Full', icon: 'Shield' },
-                            { id: 'goal', label: 'Цель', value: userData.goal || 'Катка', icon: 'Target' }
+                            { id: 'style', label: 'Стиль', value: userData.temp || 'Спокойный', icon: 'Gauge' },
+                            { id: 'music', label: 'Музыка', value: userData.music || 'Рок', icon: 'Music' },
+                            { id: 'equip', label: 'Экип', value: userData.equip || 'Только шлем', icon: 'Shield' },
+                            { id: 'goal', label: 'Цель', value: userData.goal || 'Только поездки', icon: 'Target' }
                         ]
                       })
                       .eq('id', userData.id);
@@ -1861,21 +1862,21 @@ const MainApp = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex-1">
-                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Дата</label>
+                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest text-center">Дата</label>
                     <input 
                       type="date" 
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Время</label>
+                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest text-center">Время</label>
                     <input 
                       type="time" 
                       value={newEvent.time}
                       onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
                     />
                   </div>
                 </div>
