@@ -17,6 +17,16 @@ L.Icon.Default.mergeOptions({
 });
 
 const MainApp = () => {
+  // Custom Icon for User
+  const userIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
   const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
   const [userLocation, setUserLocation] = useState(null);
@@ -102,17 +112,7 @@ const MainApp = () => {
   // Данные пользователя
   const [userData, setUserData] = useState(null);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  // const cities = ["Москва", "Санкт-Петербург", "Сочи", "Краснодар"]; // Removed hardcoded cities
-
-  // Состояния для свайпов в стиле Tinder
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [exitDirection, setExitDirection] = useState(null);
-  const cardRef = useRef(null);
-  const profileScrollRef = useRef(null); // Ref for resetting scroll
+  const [swipedUserIds, setSwipedUserIds] = useState(new Set());
 
   // Фильтруем анкеты: используем данные из Supabase
   const matchedIds = chats.map(chat => {
@@ -126,13 +126,38 @@ const MainApp = () => {
   const filteredBikers = userData ? bikers.filter(b => 
     b.city === userData.city && 
     b.gender !== userData.gender && 
-    !matchedIds.includes(b.id)
+    !matchedIds.includes(b.id) &&
+    !swipedUserIds.has(b.id)
   ) : [];
   
-  // Безопасное получение currentBiker с проверкой на существование
-  const currentBiker = filteredBikers.length > 0 && currentIndex >= 0 && currentIndex < filteredBikers.length 
-    ? filteredBikers[currentIndex] 
-    : null;
+  // Всегда берем первого доступного байкера
+  const currentBiker = filteredBikers.length > 0 ? filteredBikers[0] : null;
+
+  // Sync new matches from chats (chats with no messages are considered new matches)
+  useEffect(() => {
+    if (chats.length > 0) {
+      const freshChats = chats.filter(c => c.messages.length === 0);
+      setNewMatches(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        const added = freshChats
+          .filter(c => !existingIds.has(c.id))
+          .map(c => ({
+             id: c.id,
+             name: c.name,
+             image: c.image,
+             isNew: true
+          }));
+        
+        // Remove matches that have become chats with messages
+        const validPrev = prev.filter(m => {
+           const chat = chats.find(c => c.id === m.id || c.name === m.name);
+           return !chat || chat.messages.length === 0;
+        });
+
+        return [...added, ...validPrev];
+      });
+    }
+  }, [chats]);
 
   const [userImages, setUserImages] = useState(() => {
     // Инициализация из localStorage при первом рендере
@@ -254,25 +279,19 @@ const MainApp = () => {
     fetchUserProfile();
   }, []);
   
-  // Обновление индекса при изменении города
+  // Обновление индекса при изменении города (сброс свайпов)
   useEffect(() => {
-    if (filteredBikers.length > 0) {
-      if (currentIndex >= filteredBikers.length || currentIndex < 0) {
-        setCurrentIndex(0);
-      }
-      setCurrentImageIndex(0);
-    } else {
-      // Если нет доступных байкеров, сбрасываем индекс
-      setCurrentIndex(0);
+    if (userData?.city) {
+      setSwipedUserIds(new Set());
       setCurrentImageIndex(0);
     }
-  }, [userData?.city, filteredBikers.length, currentIndex]);
+  }, [userData?.city]);
 
   const handleNext = () => {
-    if (filteredBikers.length > 0) {
+    if (currentBiker) {
       setExitDirection('left');
       setTimeout(() => {
-          setCurrentIndex((prev) => prev + 1);
+          setSwipedUserIds(prev => new Set([...prev, currentBiker.id]));
           setCurrentImageIndex(0);
           setDragOffset({ x: 0, y: 0 });
           setExitDirection(null);
@@ -290,7 +309,7 @@ const MainApp = () => {
     setExitDirection('right');
     
     setTimeout(() => {
-        setCurrentIndex((prev) => prev + 1);
+        setSwipedUserIds(prev => new Set([...prev, likedUser.id]));
         setCurrentImageIndex(0);
         setDragOffset({ x: 0, y: 0 });
         setExitDirection(null);
@@ -506,27 +525,17 @@ const MainApp = () => {
           const newImages = [...userImages, imageUrl];
           await updateGallery(newImages);
         } else {
-          // Загрузка фото в чат (пока локально)
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (!selectedChat) return;
-            const imageMessage = {
-              id: Date.now(),
-              text: '',
-              sender: 'me',
-              image: reader.result,
-              type: 'image'
-            };
-            const updatedChat = {
-              ...selectedChat,
-              messages: [...selectedChat.messages, imageMessage],
-              lastMessage: 'Фото',
-              time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            };
-            setSelectedChat(updatedChat);
-            setChats(chats.map(c => c.id === selectedChat.id ? updatedChat : c));
-          };
-          reader.readAsDataURL(file);
+          // Загрузка фото в чат
+          try {
+             const imageUrl = await userService.uploadChatImage(userId, file);
+             
+             if (selectedChat && window.supabaseManager) {
+                 await window.supabaseManager.sendMessage(selectedChat.id, '', 'image', imageUrl);
+             }
+          } catch (e) {
+             console.error('Error uploading chat image:', e);
+             alert('Не удалось отправить фото');
+          }
         }
       } catch (err) {
         console.error('Error uploading image:', err);
@@ -893,7 +902,7 @@ const MainApp = () => {
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleLike(); }} 
-                    className="w-20 h-20 rounded-full bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-2xl active:scale-90 hover:scale-105 transition-all relative z-50"
+                    className="w-20 h-20 rounded-full bg-orange-500 bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-2xl active:scale-90 hover:scale-105 transition-all relative z-50"
                   >
                     <Heart fill="white" size={36} className="text-white" />
                   </button>
@@ -904,12 +913,6 @@ const MainApp = () => {
                 <Search size={48} className="text-zinc-800 mb-4" />
                 <p className="text-zinc-600 text-sm italic uppercase tracking-wider mb-2">
                   {filteredBikers.length === 0 ? 'Нет анкет в этом городе' : 'Анкеты закончились'}
-                </p>
-                <p className="text-zinc-700 text-xs">
-                  {filteredBikers.length === 0 
-                    ? 'Попробуйте изменить город в настройках' 
-                    : 'Зайдите позже, появятся новые'
-                  }
                 </p>
               </div>
             )}
@@ -937,32 +940,42 @@ const MainApp = () => {
                     attribution=""
                   />
                   {/* User Marker */}
-                   <Marker position={userLocation ? [userLocation.lat, userLocation.lng] : [
-                    cities.find(c => c.name === userData.city)?.lat || 55.7558, 
-                    cities.find(c => c.name === userData.city)?.lng || 37.6173
-                   ]}>
+                   <Marker 
+                    position={userLocation ? [userLocation.lat, userLocation.lng] : [
+                      cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                      cities.find(c => c.name === userData.city)?.lng || 37.6173
+                    ]}
+                    icon={userIcon}
+                   >
                       <Popup className="custom-popup">
-                         <div className="text-black font-bold">Вы здесь</div>
+                       <div className="text-black font-bold">Вы здесь</div>
                       </Popup>
                    </Marker>
                    
                    {/* Bikers Markers */}
-                   {bikers.filter(b => b.city === userData?.city).map((b, idx) => {
+                   {/* Bikers Markers */}
+                   {filteredBikers.filter(b => b.city === userData?.city).map((b) => {
                       const cityCoords = cities.find(c => c.name === userData.city) || { lat: 55.7558, lng: 37.6173 };
-                      // Pseudo-random position based on ID to be consistent across renders
-                      const seed = b.id.charCodeAt(0); 
-                      const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
-                      const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
                       
+                      let position;
+                      if (b.latitude && b.longitude) {
+                          position = [b.latitude, b.longitude];
+                      } else {
+                          // Pseudo-random position based on ID
+                          const seed = b.id.charCodeAt(0); 
+                          const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
+                          const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
+                          position = [cityCoords.lat + latOffset, cityCoords.lng + lngOffset];
+                      }
+                          
                       return (
-                        <Marker key={b.id} position={[cityCoords.lat + latOffset, cityCoords.lng + lngOffset]}>
+                        <Marker key={b.id} position={position}>
                           <Popup className="custom-popup">
-                            <div className="w-48 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10 flex flex-col">
+                            <div className="w-48 bg-black/90 backdrop-blur-xl border border-white/10 flex flex-col">
                                <div className="h-32 w-full relative shrink-0">
-                                  <img src={b.images[0] || DEFAULT_AVATAR} className="w-full h-full object-cover" alt={b.name}/>
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
+                                  <img src={b.images?.[0] || b.image} className="w-full h-full object-cover" alt={b.name} />
                                   <div className="absolute bottom-2 left-3">
-                                     <span className="font-black italic uppercase text-lg leading-none block">{b.name}, {b.age}</span>
+                                     <span className="font-black italic uppercase text-lg leading-none block text-white">{b.name}, {b.age}</span>
                                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{b.has_bike ? b.bike : "Ищу того, кто прокатит"}</span>
                                   </div>
                                </div>
@@ -1867,7 +1880,7 @@ const MainApp = () => {
                       type="date" 
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-sm outline-none focus:border-orange-500 text-center appearance-none min-w-0"
                     />
                   </div>
                   <div className="flex-1">
@@ -1876,7 +1889,7 @@ const MainApp = () => {
                       type="time" 
                       value={newEvent.time}
                       onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-sm outline-none focus:border-orange-500 text-center appearance-none min-w-0"
                     />
                   </div>
                 </div>

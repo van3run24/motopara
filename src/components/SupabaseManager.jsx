@@ -162,7 +162,9 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             })) || [],
             name: chat.participant_1_id === userId ? (chat.participant_2?.name || 'Неизвестный пользователь') : (chat.participant_1?.name || 'Неизвестный пользователь'),
             image: chat.participant_1_id === userId ? (chat.participant_2?.image || null) : (chat.participant_1?.image || null),
-            lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
+            lastMessage: messages?.length > 0 
+              ? (messages[messages.length - 1].type === 'image' ? '📷 Фотография' : (messages[messages.length - 1].text || 'Сообщение'))
+              : 'Начните общение',
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
               ''
@@ -218,32 +220,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     return () => clearInterval(interval);
   }, []);
 
-  // Real-time подписка на сообщения
-  useEffect(() => {
-    const userId = localStorage.getItem('userId');
-    if (!userId) return;
-
-    const subscription = supabase
-      .channel('messages')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'messages'
-        }, 
-        (payload) => {
-          console.log('Message update:', payload);
-          loadChats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Real-time подписка на новые чаты
+  // Real-time subscriptions
   useEffect(() => {
     const userId = localStorage.getItem('userId');
     if (!userId) return;
@@ -257,32 +234,65 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           table: 'chats'
         }, 
         (payload) => {
-          console.log('New chat:', payload);
-          if (payload.new.participant_1_id === userId || payload.new.participant_2_id === userId) {
-            loadChats();
-            loadUsers();
+          // console.log('New chat:', payload);
+          // Use loose comparison for IDs and add delay to ensure consistency
+          if (payload.new.participant_1_id == userId || payload.new.participant_2_id == userId) {
+            setTimeout(() => {
+              loadChats();
+              loadUsers();
+            }, 1000);
           }
         }
       )
       .subscribe();
 
+    const messageSubscription = supabase
+      .channel('messages')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'messages'
+        }, 
+        (payload) => {
+          // console.log('Message update:', payload);
+          // Add delay to ensure transaction visibility
+          setTimeout(() => loadChats(), 500);
+        }
+      )
+      .subscribe();
+
+    // Polling fallback to ensure data consistency
+    const interval = setInterval(() => {
+      loadChats();
+      loadUsers();
+    }, 30000);
+
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
+      supabase.removeChannel(messageSubscription);
+      clearInterval(interval);
     };
   }, []);
 
   // Экспортируем функции для использования в MainApp
   window.supabaseManager = {
-    sendMessage: async (chatId, text) => {
+    sendMessage: async (chatId, text, type = 'text', image = null) => {
       const userId = localStorage.getItem('userId');
+      const messageData = {
+        chat_id: chatId,
+        sender_id: userId,
+        text: text,
+        type: type
+      };
+      
+      if (image) {
+        messageData.image = image;
+      }
+
       const { data, error } = await supabase
         .from('messages')
-        .insert([{
-          chat_id: chatId,
-          sender_id: userId,
-          text: text,
-          type: 'text'
-        }])
+        .insert([messageData])
         .select()
         .single();
       

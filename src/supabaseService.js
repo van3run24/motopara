@@ -109,6 +109,31 @@ export const userService = {
       .getPublicUrl(fileName);
     
     return publicUrl;
+  },
+
+  // Загрузка фото в чат
+  async uploadChatImage(userId, file) {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}/chat/${Date.now()}.${fileExt}`;
+    
+    const { data, error } = await supabase.storage
+      .from('chat-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) {
+       console.error("Error uploading chat image:", error);
+       throw error;
+    }
+    
+    // Получаем публичный URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('chat-images')
+      .getPublicUrl(fileName);
+    
+    return publicUrl;
   }
 };
 
