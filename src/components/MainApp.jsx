@@ -29,6 +29,7 @@ const MainApp = () => {
   };
 
   const [selectedImage, setSelectedImage] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   useEffect(() => {
     if (navigator.geolocation) {
