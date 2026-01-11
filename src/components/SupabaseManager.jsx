@@ -80,7 +80,17 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         chat.participant_1_id === localStorage.getItem('userId') ? chat.participant_2_id : chat.participant_1_id
       ) || [];
       
-      const filteredUsers = users.filter(user => !matchedIds.includes(user.id))
+      // Получаем лайки/дизлайки
+      const userId = localStorage.getItem('userId');
+      const { data: likes } = await supabase
+        .from('likes')
+        .select('to_user_id')
+        .eq('from_user_id', userId);
+
+      const swipedIds = likes?.map(like => like.to_user_id) || [];
+      const excludeIds = [...matchedIds, ...swipedIds];
+
+      const filteredUsers = users.filter(user => !excludeIds.includes(user.id))
         .map(u => {
            const coords = u.coords || { x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 };
            
@@ -278,7 +288,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
   // Экспортируем функции для использования в MainApp
   window.supabaseManager = {
-    sendMessage: async (chatId, text) => {
+    sendMessage: async (chatId, text, type = 'text', imageUrl = null) => {
       const userId = localStorage.getItem('userId');
       const { data, error } = await supabase
         .from('messages')
@@ -286,7 +296,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           chat_id: chatId,
           sender_id: userId,
           text: text,
-          type: 'text'
+          type: type,
+          image: imageUrl
         }])
         .select()
         .single();

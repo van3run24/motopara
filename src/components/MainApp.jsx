@@ -481,59 +481,48 @@ const MainApp = () => {
   };
 
   const handleImageUpload = async (e, isProfile = false, isGallery = false) => {
-    const file = e.target.files[0];
-    if (file) {
-      try {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    try {
         const userId = localStorage.getItem('userId');
         
         if (isProfile && userId) {
-          // Загрузка аватара в Supabase
-          const imageUrl = await userService.uploadAvatar(userId, file);
-          
-          // Обновляем поле image в таблице users
-          await supabase
-            .from('users')
-            .update({ image: imageUrl })
-            .eq('id', userId);
-
-          setUserData({...userData, image: imageUrl});
-          // Добавляем в галерею, если еще нет
-          if (!userImages.includes(imageUrl)) {
-             const newImages = [imageUrl, ...userImages];
-             await updateGallery(newImages);
-          }
+            const file = e.target.files[0];
+            const imageUrl = await userService.uploadAvatar(userId, file);
+            await supabase.from('users').update({ image: imageUrl }).eq('id', userId);
+            setUserData({...userData, image: imageUrl});
+            if (!userImages.includes(imageUrl)) {
+                await updateGallery([imageUrl, ...userImages]);
+            }
         } else if (isGallery && userId) {
-          // Загрузка фото в галерею Supabase
-          const imageUrl = await userService.uploadGalleryImage(userId, file);
-          const newImages = [...userImages, imageUrl];
-          await updateGallery(newImages);
+            const file = e.target.files[0];
+            const imageUrl = await userService.uploadGalleryImage(userId, file);
+            await updateGallery([...userImages, imageUrl]);
         } else {
-          // Загрузка фото в чат (пока локально)
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (!selectedChat) return;
-            const imageMessage = {
-              id: Date.now(),
-              text: '',
-              sender: 'me',
-              image: reader.result,
-              type: 'image'
-            };
-            const updatedChat = {
-              ...selectedChat,
-              messages: [...selectedChat.messages, imageMessage],
-              lastMessage: 'Фото',
-              time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-            };
-            setSelectedChat(updatedChat);
-            setChats(chats.map(c => c.id === selectedChat.id ? updatedChat : c));
-          };
-          reader.readAsDataURL(file);
+            // Chat images (support multiple)
+            const files = Array.from(e.target.files);
+            for (const file of files) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                
+                const { error: uploadError } = await supabase.storage
+                    .from('images')
+                    .upload(fileName, file);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('images')
+                    .getPublicUrl(fileName);
+
+                if (selectedChat && window.supabaseManager) {
+                    await window.supabaseManager.sendMessage(selectedChat.id, '', 'image', publicUrl);
+                }
+            }
         }
-      } catch (err) {
+    } catch (err) {
         console.error('Error uploading image:', err);
         setError('Ошибка загрузки фото');
-      }
     }
   };
 
@@ -1300,7 +1289,7 @@ const MainApp = () => {
               {selectedChat.messages.map((msg, idx) => (
                     <div 
                         key={msg.id || idx} 
-                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
+                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'} ${editingMessage?.id === msg.id ? 'ring-2 ring-orange-500 rounded-2xl' : ''}`}
                         onClick={() => {
                             if (msg.sender === 'me') {
                                 setContextMenuMessageId(contextMenuMessageId === msg.id ? null : msg.id);
@@ -1345,7 +1334,7 @@ const MainApp = () => {
                         <div className={`px-3 py-2 rounded-2xl text-sm border relative min-w-[80px] ${msg.sender === 'me' ? 'bg-orange-600 border-orange-600 text-white rounded-br-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-bl-none'}`}>
                           <div className="flex flex-wrap gap-x-2 items-end">
                             <span className="leading-relaxed break-words whitespace-pre-wrap">{msg.text || ''}</span>
-                            {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(изменено)</span>}
+                            {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(ред.)</span>}
                             <div className={`flex items-center gap-1 select-none ml-auto h-4 ${msg.sender === 'me' ? 'text-white/70' : 'text-zinc-500'}`}>
                                <span className="text-[9px] font-medium">
                                   {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -1412,6 +1401,7 @@ const MainApp = () => {
                 type="file" 
                 ref={chatFileInputRef}
                 accept="image/*"
+                multiple
                 onChange={(e) => handleImageUpload(e, false)}
                 className="hidden"
               />
@@ -1962,14 +1952,15 @@ const MainApp = () => {
 
         {/* VIEW PROFILE MODAL */}
         {viewingProfile && (
-          <div className="absolute inset-0 bg-black z-[100] p-4 flex flex-col animate-in slide-in-from-right duration-300">
-             <div className="flex items-center gap-4 mb-4">
-                <button onClick={() => setViewingProfile(null)} className="p-2 bg-white/5 rounded-xl"><ChevronLeft size={24}/></button>
-                <h2 className="text-xl font-black uppercase italic">Анкета</h2>
-              </div>
+          <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center animate-in fade-in duration-200">
+             <div className="w-full max-w-md h-full bg-black relative flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-300 sm:rounded-[32px] sm:h-[90vh] sm:border sm:border-white/10">
+                <div className="flex items-center gap-4 mb-4 p-4 shrink-0 z-10">
+                  <button onClick={() => setViewingProfile(null)} className="p-2 bg-white/5 rounded-xl backdrop-blur-md"><ChevronLeft size={24}/></button>
+                  <h2 className="text-xl font-black uppercase italic">Анкета</h2>
+                </div>
               
-              <div className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
-                  <div className="relative aspect-[3/4] rounded-[32px] overflow-hidden mb-4">
+                <div className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
+                  <div className="relative aspect-[3/4] overflow-hidden mb-4">
                     <img 
                       src={viewingProfile.images && viewingProfile.images.length > 0 ? viewingProfile.images[0] : (viewingProfile.image || DEFAULT_AVATAR)} 
                       className="w-full h-full object-cover" 
@@ -1999,13 +1990,13 @@ const MainApp = () => {
                     ))}
                   </div>
 
-                  {viewingProfile.description && (
+                  {viewingProfile.about && (
                     <div className="bg-white/5 border border-white/10 p-6 rounded-[32px] mb-4">
                       <div className="text-[10px] uppercase font-black text-zinc-500 tracking-wider mb-3 flex items-center gap-2">
                         <Info size={14} />
                         О себе
                       </div>
-                      <p className="text-zinc-300 leading-relaxed font-medium">{viewingProfile.description}</p>
+                      <p className="text-zinc-300 leading-relaxed font-medium">{viewingProfile.about}</p>
                     </div>
                   )}
                   
@@ -2019,6 +2010,7 @@ const MainApp = () => {
                      </div>
                   )}
               </div>
+           </div>
           </div>
         )}
       </main>
