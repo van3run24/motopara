@@ -625,6 +625,71 @@ const MainApp = () => {
   };
 
 
+  // Real-time messages update
+  useEffect(() => {
+    if (selectedChat) {
+      // Mark messages as read when entering chat
+      if (window.supabaseManager) {
+        window.supabaseManager.markMessagesAsRead(selectedChat.id);
+      }
+
+      const subscription = supabase
+        .channel(`chat:${selectedChat.id}`)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'messages',
+            filter: `chat_id=eq.${selectedChat.id}`
+          }, 
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newMessage = payload.new;
+              
+              // Mark as read immediately if chat is open and message is from partner
+              if (newMessage.sender_id !== localStorage.getItem('userId')) {
+                 if (window.supabaseManager) {
+                    window.supabaseManager.markMessagesAsRead(selectedChat.id);
+                 }
+              }
+
+              setSelectedChat(prev => {
+                if (!prev || prev.id !== newMessage.chat_id) return prev;
+                
+                // Check if message already exists
+                if (prev.messages && prev.messages.some(m => m.id === newMessage.id)) return prev;
+                
+                return {
+                  ...prev,
+                  messages: [...(prev.messages || []), {
+                    ...newMessage,
+                    sender: newMessage.sender_id === localStorage.getItem('userId') ? 'me' : 'other'
+                  }]
+                };
+              });
+            } else if (payload.eventType === 'DELETE') {
+                 setSelectedChat(prev => ({
+                     ...prev,
+                     messages: prev.messages.filter(m => m.id !== payload.old.id)
+                 }));
+            } else if (payload.eventType === 'UPDATE') {
+                 setSelectedChat(prev => ({
+                     ...prev,
+                     messages: prev.messages.map(m => 
+                         m.id === payload.new.id ? { ...m, ...payload.new, sender: m.sender } : m
+                     )
+                 }));
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [selectedChat?.id]);
+
   // Автоскролл к последнему сообщению
   useEffect(() => {
     if (messagesEndRef.current) {
