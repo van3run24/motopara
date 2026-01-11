@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRight, Loader2, MapPin } from 'lucide-react';
+import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cities } from '../data/cities';
 
@@ -14,49 +14,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     city: 'Москва',
     gender: 'male'
   });
-
-  const checkGeo = (silent = false) => {
-    if (!navigator.geolocation) {
-      if (!silent) alert('Геолокация не поддерживается вашим браузером');
-      return;
-    }
-    
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        // Find closest city
-        let closestCity = cities[0];
-        let minDistance = Infinity;
-        
-        cities.forEach(city => {
-          const distance = Math.sqrt(
-            Math.pow(city.lat - latitude, 2) + 
-            Math.pow(city.lng - longitude, 2)
-          );
-          if (distance < minDistance) {
-            minDistance = distance;
-            closestCity = city;
-          }
-        });
-        
-        setFormData(prev => ({ ...prev, city: closestCity.name }));
-        setLoading(false);
-      },
-      (err) => {
-        console.error(err);
-        if (!silent) alert('Не удалось определить местоположение. Пожалуйста, выберите город вручную.');
-        setLoading(false);
-      }
-    );
-  };
-
-  useEffect(() => {
-    if (!isLogin) {
-      checkGeo(true);
-    }
-  }, [isLogin]);
 
   if (!isOpen) return null;
 
@@ -191,13 +148,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                 
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between ml-3 mb-1">
-                        <label className="text-xs font-bold uppercase text-zinc-500">Город</label>
-                        <button type="button" onClick={checkGeo} className="text-[10px] font-bold uppercase text-orange-500 flex items-center gap-1 hover:text-orange-400">
-                          <MapPin size={10} />
-                          Гео
-                        </button>
-                      </div>
+                      <label className="text-xs font-bold uppercase text-zinc-500 ml-3">Город</label>
                       <select
                         value={formData.city}
                         onChange={(e) => setFormData({...formData, city: e.target.value})}

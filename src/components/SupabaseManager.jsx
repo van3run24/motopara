@@ -185,12 +185,13 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       loadUsers();
       loadChats();
       loadEvents();
-      updateUserLocation(); // Обновляем геолокацию
+      // updateUserLocation(); // Отключено авто-обновление геолокации
     }
     setLoading(false);
   }, [userData?.city, userData?.gender]);
 
-  // Периодическое обновление геолокации (каждые 5 минут)
+  // Периодическое обновление геолокации отключено
+  /*
   useEffect(() => {
     const interval = setInterval(() => {
       if (localStorage.getItem('userId')) {
@@ -200,6 +201,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
     return () => clearInterval(interval);
   }, []);
+  */
 
   // Real-time подписка на сообщения
   useEffect(() => {

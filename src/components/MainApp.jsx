@@ -1222,21 +1222,24 @@ const MainApp = () => {
             <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col italic font-medium scrollbar-hide">
               {selectedChat.messages.length > 0 ? (
                 <>
-              {selectedChat.messages.map(msg => (
-                    <div key={msg.id} className={`max-w-[85%] ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}>
+              {selectedChat.messages.map(msg => {
+                const isMe = msg.sender === 'me' || msg.sender_id === localStorage.getItem('userId');
+                return (
+                    <div key={msg.id} className={`max-w-[85%] ${isMe ? 'self-end' : 'self-start'}`}>
                       {msg.type === 'image' ? (
                         <img 
                           src={msg.image} 
                           alt="Sent" 
-                          className={`rounded-[24px] ${msg.sender === 'me' ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto`}
+                          className={`rounded-[24px] ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-full h-auto`}
                         />
                       ) : (
-                        <div className={`p-4 rounded-[24px] text-sm ${msg.sender === 'me' ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
+                        <div className={`p-4 rounded-[24px] text-sm ${isMe ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/5 text-zinc-200 rounded-tl-none border border-white/5'}`}>
                           {msg.text}
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+              })}
                   <div ref={messagesEndRef} />
                 </>
               ) : (
