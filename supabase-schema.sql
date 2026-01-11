@@ -14,6 +14,7 @@ CREATE TABLE users (
   equip VARCHAR(50),
   goal VARCHAR(50),
   image TEXT,
+  images TEXT[],
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
   location_updated_at TIMESTAMP WITH TIME ZONE,
