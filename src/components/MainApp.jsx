@@ -46,6 +46,33 @@ const MainApp = () => {
     }
   }, []);
 
+  // Online status tracking with Supabase Presence
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const channel = supabase.channel('online_users')
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const onlineIds = new Set();
+        Object.values(state).forEach(presences => {
+          presences.forEach(presence => {
+            if (presence.user_id) onlineIds.add(presence.user_id);
+          });
+        });
+        setOnlineUsers(onlineIds);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: userId, online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
           const checkSession = async () => {
               const { data: { session } } = await supabase.auth.getSession();
@@ -262,19 +289,11 @@ const MainApp = () => {
     fetchUserProfile();
   }, []);
   
-  // Обновление индекса при изменении города
+  // Обновление индекса при изменении фильтров
   useEffect(() => {
-    if (filteredBikers.length > 0) {
-      if (currentIndex >= filteredBikers.length || currentIndex < 0) {
-        setCurrentIndex(0);
-      }
-      setCurrentImageIndex(0);
-    } else {
-      // Если нет доступных байкеров, сбрасываем индекс
-      setCurrentIndex(0);
-      setCurrentImageIndex(0);
-    }
-  }, [userData?.city, filteredBikers.length, currentIndex]);
+    setCurrentIndex(0);
+    setCurrentImageIndex(0);
+  }, [userData?.city, userData?.gender]);
 
   const handleNext = () => {
     if (filteredBikers.length > 0) {
@@ -1100,20 +1119,25 @@ const MainApp = () => {
                       {event.description && (
                       <p className="text-xs text-zinc-400 mb-3 italic">{event.description}</p>
                     )}
-                    <div className="flex flex-wrap gap-3 text-[10px] text-zinc-500 uppercase">
-                      {event.date && (
-                        <div className="flex items-center gap-1">
-                          <span>{event.date}</span>
-                        </div>
-                      )}
-                      {event.time && (
-                        <div className="flex items-center gap-1">
-                          <span>{event.time}</span>
-                        </div>
-                      )}
+                    <div className="flex flex-col gap-2 mt-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                        {event.date && (
+                          <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg flex-1 justify-center">
+                            <Calendar size={14} className="text-orange-500" />
+                            <span>{event.date}</span>
+                          </div>
+                        )}
+                        {event.time && (
+                          <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg flex-1 justify-center">
+                            <Clock size={14} className="text-orange-500" />
+                            <span>{event.time}</span>
+                          </div>
+                        )}
+                      </div>
                       {event.address && (
-                        <div className="flex items-center gap-1">
-                          <span>{event.address}</span>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
+                          <MapPin size={14} className="shrink-0" />
+                          <span className="truncate">{event.address}</span>
                         </div>
                       )}
                     </div>
@@ -1237,7 +1261,7 @@ const MainApp = () => {
                         >
                           <div className="relative">
                             <img src={chat.image || DEFAULT_AVATAR} className={`w-14 h-14 rounded-[22px] object-cover ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`} alt="" />
-                            {chat.online && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>}
+                            {onlineUsers.has(chat.partnerId) && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>}
                             {chat.unreadCount > 0 && <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-600 rounded-full border-4 border-black flex items-center justify-center text-[10px] font-black">{chat.unreadCount}</div>}
                           </div>
                           <div className="flex-1">
@@ -1315,7 +1339,7 @@ const MainApp = () => {
                   <img src={selectedChat.image || DEFAULT_AVATAR} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
                 <div>
                 <h4 className="font-bold text-sm uppercase italic">{selectedChat.name || 'Пользователь'}</h4>
-                  {selectedChat.online && <p className="text-[9px] text-green-500 font-bold uppercase">В сети</p>}
+                  {selectedChat.partnerId && onlineUsers.has(selectedChat.partnerId) && <p className="text-[9px] text-green-500 font-bold uppercase">В сети</p>}
                 </div>
               </button>
             </div>
@@ -1997,12 +2021,19 @@ const MainApp = () => {
                       className="w-full h-full object-cover" 
                       alt="" 
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
-                    <div className="absolute bottom-0 left-0 p-8 w-full">
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
+                      style={{ height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 25%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0) 100%)' }}
+                    />
+                    <div className="absolute bottom-0 left-0 p-8 w-full z-30">
                       <h2 className="text-4xl font-black uppercase italic leading-none mb-2">{viewingProfile.name}</h2>
-                      <div className="flex items-center gap-2 text-zinc-300 font-medium mb-4">
+                      <div className="flex items-center gap-2 text-zinc-300 font-medium mb-2">
                         <MapPin size={16} className="text-orange-500" />
                         <span className="uppercase tracking-widest text-xs">{viewingProfile.city || 'Не указан'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Zap size={16} className="text-orange-500 fill-orange-500 drop-shadow-2xl" />
+                        <p className="text-orange-500 text-sm font-bold uppercase tracking-widest drop-shadow-2xl">{viewingProfile.has_bike ? viewingProfile.bike : "Ищу того, кто прокатит"}</p>
                       </div>
                     </div>
                   </div>

@@ -15,6 +15,41 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     gender: 'male'
   });
 
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Auto-detect location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Find closest city
+          let minDistance = Infinity;
+          let closestCity = 'Москва';
+          
+          cities.forEach(city => {
+            if (city.lat && city.lng) {
+              const distance = Math.sqrt(
+                Math.pow(city.lat - latitude, 2) + 
+                Math.pow(city.lng - longitude, 2)
+              );
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestCity = city.name;
+              }
+            }
+          });
+          
+          setFormData(prev => ({ ...prev, city: closestCity }));
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleGoogleLogin = async () => {
@@ -166,8 +201,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                         onChange={(e) => setFormData({...formData, gender: e.target.value})}
                         className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 text-white focus:outline-none focus:border-orange-500/50 transition-colors appearance-none cursor-pointer"
                       >
-                        <option value="male" className="bg-zinc-900">Парень</option>
-                        <option value="female" className="bg-zinc-900">Девушка</option>
+                        <option value="male" className="bg-zinc-900">Мужской</option>
+                        <option value="female" className="bg-zinc-900">Женский</option>
                       </select>
                     </div>
                 </div>

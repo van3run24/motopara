@@ -35,6 +35,17 @@ DROP POLICY IF EXISTS "Users can delete their own messages" ON public.messages;
 CREATE POLICY "Users can delete their own messages" ON public.messages
 FOR DELETE USING (auth.uid() = sender_id);
 
+-- NEW POLICY: Allow updating is_read for received messages
+DROP POLICY IF EXISTS "Users can mark received messages as read" ON public.messages;
+CREATE POLICY "Users can mark received messages as read" ON public.messages
+FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM public.chats
+    WHERE id = messages.chat_id
+    AND (participant_1_id = auth.uid() OR participant_2_id = auth.uid())
+  )
+);
+
 -- ALLOW READ STATUS UPDATES (Safe RPC function)
 -- This function allows updating is_read status for messages in a chat where the user is a participant
 CREATE OR REPLACE FUNCTION mark_messages_read(p_chat_id bigint)
@@ -101,15 +112,3 @@ FOR INSERT WITH CHECK (auth.uid() = created_by_id);
 DROP POLICY IF EXISTS "Users can delete own events" ON public.events;
 CREATE POLICY "Users can delete own events" ON public.events
 FOR DELETE USING (auth.uid() = created_by_id);
-
--- STORAGE POLICIES
--- Create bucket 'images' if not exists
-INSERT INTO storage.buckets (id, name, public) VALUES ('images', 'images', true) ON CONFLICT DO NOTHING;
-
-DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
-CREATE POLICY "Allow authenticated uploads" ON storage.objects
-FOR INSERT TO authenticated WITH CHECK (bucket_id = 'images');
-
-DROP POLICY IF EXISTS "Allow public viewing" ON storage.objects;
-CREATE POLICY "Allow public viewing" ON storage.objects
-FOR SELECT TO public USING (bucket_id = 'images');
