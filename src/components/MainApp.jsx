@@ -1957,36 +1957,36 @@ const MainApp = () => {
                     placeholder="Описание события..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest text-center">Дата</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <Calendar size={18} className="text-zinc-400 flex-shrink-0" />
                     <input 
                       type="date" 
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
+                      className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest text-center">Время</label>
+                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <Clock size={18} className="text-zinc-400 flex-shrink-0" />
                     <input 
                       type="time" 
                       value={newEvent.time}
                       onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
+                      className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Адрес</label>
-                  <input 
-                    type="text" 
-                    value={newEvent.address}
-                    onChange={(e) => setNewEvent({...newEvent, address: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
-                    placeholder="Место встречи"
-                  />
-                </div>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <MapPinIcon size={18} className="text-zinc-400 flex-shrink-0" />
+                    <input 
+                      type="text" 
+                      value={newEvent.address}
+                      onChange={(e) => setNewEvent({...newEvent, address: e.target.value})}
+                      className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
+                      placeholder="Место встречи"
+                    />
+                  </div>
                 <div>
                   <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Ссылка на организатора</label>
                   <input 
