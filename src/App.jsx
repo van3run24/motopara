@@ -140,9 +140,8 @@ function App() {
           <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-center mb-16">
             Живи <span className="text-orange-500">свободно</span>
           </h2>
-          <div className="max-w-7xl mx-auto space-y-4">
-            {/* Верхние 3 фото на всю ширину */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="group relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
                 <img 
                   src="/gallery/event.jpg" 
@@ -155,7 +154,6 @@ function App() {
                     <p className="text-white/80 text-xs">Катайся вместе</p>
                   </div>
                 </div>
-              </div>
               </div>
               
               <div className="group relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
@@ -185,20 +183,20 @@ function App() {
                   </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Большое фото внизу на всю ширину */}
-            <div className="group relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
-              <img 
-                src="/gallery/love.jpg" 
-                alt="Байкерские знакомства"
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="absolute bottom-4 left-4 right-4">
-                  <p className="text-white text-lg font-bold uppercase tracking-wider">Любовь и скорость</p>
-                  <p className="text-white/80 text-sm">Найди того, кто разделит твою дорогу</p>
+              
+              <div className="group relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
+                <img 
+                  src="/gallery/love.jpg" 
+                  alt="Байкерские знакомства"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <p className="text-white text-sm font-bold uppercase tracking-wider">Любовь и скорость</p>
+                    <p className="text-white/80 text-sm">Найди того, кто разделит твою дорогу</p>
+                  </div>
                 </div>
+              </div>
             </div>
           </div>
         </section>
