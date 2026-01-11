@@ -164,6 +164,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             .eq('chat_id', chat.id)
             .order('created_at', { ascending: true });
           
+          console.log(`Loaded ${messages?.length || 0} messages for chat ${chat.id}:`, messages?.map(m => ({id: m.id, sender: m.sender_id, is_read: m.is_read, text: m.text?.substring(0, 30)})));
+          
           const partner = chat.participant_1_id === userId ? chat.participant_2 : chat.participant_1;
           const isOnline = partner?.location_updated_at && (new Date() - new Date(partner.location_updated_at) < 15 * 60 * 1000);
 
@@ -181,7 +183,13 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
               '',
-            unreadCount: messages?.filter(m => m.sender_id !== userId && !m.is_read).length || 0
+            unreadCount: messages?.filter(m => {
+              const isUnread = m.sender_id !== userId && !m.is_read;
+              if (isUnread) {
+                console.log(`Unread message found: id=${m.id}, sender=${m.sender_id}, is_read=${m.is_read}, text=${m.text?.substring(0, 30)}...`);
+              }
+              return isUnread;
+            }).length || 0
           };
         })
       );
