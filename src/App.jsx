@@ -136,50 +136,18 @@ function App() {
         </section>
 
         {/* Галерея */}
-        <section className="mt-24 py-16">
-          <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-center mb-12">
+        <section className="mt-32 py-20">
+          <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-center mb-16">
             Живи <span className="text-orange-500">свободно</span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-6xl mx-auto px-4 h-auto md:h-[600px]">
-            {/* Первое фото - большое */}
-            <div className="md:col-span-8 relative group overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.02] h-[400px] md:h-full">
-                <img 
-                  src="https://images.unsplash.com/photo-1558981806-ec527fa84c3d?auto=format&fit=crop&q=80&w=1200" 
-                  alt="Freedom"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-                <div className="absolute bottom-8 left-8">
-                  <span className="text-white text-3xl font-black italic uppercase tracking-wider block mb-2">Свобода</span>
-                  <p className="text-zinc-300 max-w-md">Дорога — это единственное, что имеет значение, когда ты за рулем.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02]">
+                <div className="w-full h-full bg-gradient-to-br from-orange-600/20 to-zinc-800/20 flex items-center justify-center">
+                  <span className="text-zinc-600 text-xs uppercase font-black">Фото {i}</span>
                 </div>
-            </div>
-
-            {/* Правая колонка с двумя фото */}
-            <div className="md:col-span-4 flex flex-col gap-6 h-full">
-                <div className="flex-1 relative group overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.02] min-h-[250px]">
-                    <img 
-                      src="https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=600" 
-                      alt="Speed"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-                    <div className="absolute bottom-6 left-6">
-                       <span className="text-white text-xl font-black italic uppercase tracking-wider">Скорость</span>
-                    </div>
-                </div>
-                <div className="flex-1 relative group overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.02] min-h-[250px]">
-                    <img 
-                      src="https://images.unsplash.com/photo-1558980664-3a031cf67ea8?auto=format&fit=crop&q=80&w=600" 
-                      alt="Passion"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-                    <div className="absolute bottom-6 left-6">
-                       <span className="text-white text-xl font-black italic uppercase tracking-wider">Страсть</span>
-                    </div>
-                </div>
-            </div>
+              </div>
+            ))}
           </div>
         </section>
 

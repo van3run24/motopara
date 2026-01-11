@@ -5,6 +5,7 @@ import { Gauge, Music, Shield, Target } from 'lucide-react';
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const typingChannelsRef = React.useRef({});
 
   // Получение геолокации пользователя
   const getUserLocation = () => {
@@ -58,6 +59,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
   // Загрузка пользователей для поиска
   const loadUsers = async () => {
+    if (!userData) return;
     try {
       const { data: users, error } = await supabase
         .from('users')
@@ -83,6 +85,17 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
            const coords = u.coords || { x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 };
            
            let interests = u.interests;
+           
+           // Handle case where interests might be a JSON string
+           if (typeof interests === 'string') {
+             try {
+               interests = JSON.parse(interests);
+             } catch (e) {
+               console.error('Error parsing interests:', e);
+               interests = null;
+             }
+           }
+
            if (!interests || !Array.isArray(interests)) {
               interests = [
                 { id: 'style', label: 'Стиль', value: u.temp || 'Спорт', icon: 'Gauge' },
@@ -105,7 +118,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
              ...u,
              coords,
              images: u.images || (u.image ? [u.image] : []),
-             interests: interestsWithIcons
+             interests: interestsWithIcons,
+             about: u.about // Ensure about is passed
            };
         });
       onUsersLoaded(filteredUsers);
@@ -142,9 +156,12 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           
           return {
             ...chat,
-            messages: messages || [],
-            name: chat.participant_1_id === userId ? chat.participant_2.name : chat.participant_1.name,
-            image: chat.participant_1_id === userId ? chat.participant_2.image : chat.participant_1.image,
+            messages: messages?.map(m => ({
+              ...m,
+              sender: m.sender_id === userId ? 'me' : 'other'
+            })) || [],
+            name: chat.participant_1_id === userId ? (chat.participant_2?.name || 'Неизвестный пользователь') : (chat.participant_1?.name || 'Неизвестный пользователь'),
+            image: chat.participant_1_id === userId ? (chat.participant_2?.image || null) : (chat.participant_1?.image || null),
             lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
@@ -185,13 +202,12 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       loadUsers();
       loadChats();
       loadEvents();
-      // updateUserLocation(); // Отключено авто-обновление геолокации
+      updateUserLocation(); // Обновляем геолокацию
     }
     setLoading(false);
   }, [userData?.city, userData?.gender]);
 
-  // Периодическое обновление геолокации отключено
-  /*
+  // Периодическое обновление геолокации (каждые 5 минут)
   useEffect(() => {
     const interval = setInterval(() => {
       if (localStorage.getItem('userId')) {
@@ -201,7 +217,6 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
     return () => clearInterval(interval);
   }, []);
-  */
 
   // Real-time подписка на сообщения
   useEffect(() => {
@@ -212,12 +227,12 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       .channel('messages')
       .on('postgres_changes', 
         { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'messages'
         }, 
         (payload) => {
-          console.log('New message:', payload);
+          console.log('Message update:', payload);
           loadChats();
         }
       )
@@ -325,6 +340,13 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       if (error) throw error;
       return data;
     },
+    deleteMessage: async (messageId) => {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+      if (error) throw error;
+    },
     editMessage: async (messageId, newText) => {
       const { error } = await supabase
         .from('messages')
@@ -332,21 +354,46 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .eq('id', messageId);
       if (error) throw error;
     },
-    markMessagesAsRead: async (chatId) => {
-      const userId = localStorage.getItem('userId');
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('chat_id', chatId)
-        .neq('sender_id', userId)
-        .eq('is_read', false);
-      
-      if (error) throw error;
-    },
     updateUserLocation,
     loadUsers,
     loadChats,
     loadEvents,
+    sendTyping: async (chatId) => {
+      const userId = localStorage.getItem('userId');
+      let channel = typingChannelsRef.current[chatId];
+      
+      if (!channel) {
+          channel = supabase.channel(`typing:${chatId}`);
+          typingChannelsRef.current[chatId] = channel;
+          await channel.subscribe();
+      }
+
+      await channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId, chatId }
+      });
+    },
+    subscribeToTyping: (chatId, callback) => {
+      let channel = typingChannelsRef.current[chatId];
+      
+      if (!channel) {
+          channel = supabase.channel(`typing:${chatId}`);
+          typingChannelsRef.current[chatId] = channel;
+          channel.subscribe();
+      }
+      
+      channel.on('broadcast', { event: 'typing' }, (payload) => {
+          if (payload.payload.userId !== localStorage.getItem('userId')) {
+            callback(payload.payload);
+          }
+      });
+      
+      return () => {
+          supabase.removeChannel(channel);
+          delete typingChannelsRef.current[chatId];
+      };
+    },
     // Тестовая функция для заполнения базы
     seedDatabase: async () => {
       const demoUsers = [

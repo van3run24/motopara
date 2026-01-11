@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cities } from '../data/cities';
@@ -112,7 +112,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[85vh] md:max-h-none md:h-auto flex flex-col my-auto md:my-0">
+      <div className="relative w-full max-w-md bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
         {/* Close button */}
         <button 
           onClick={onClose}
@@ -121,7 +121,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
           <X size={20} />
         </button>
 
-        <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+        <div className="p-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-black italic uppercase tracking-tight mb-2">
               {isLogin ? 'С возвращением' : 'Создать аккаунт'}
@@ -146,7 +146,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold uppercase text-zinc-500 ml-3">Город</label>
                       <select
