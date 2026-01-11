@@ -6,7 +6,7 @@ ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
 -- MESSAGES POLICIES
--- Allow users to view messages in chats they are part of
+DROP POLICY IF EXISTS "Users can view messages in their chats" ON public.messages;
 CREATE POLICY "Users can view messages in their chats" ON public.messages
 FOR SELECT USING (
   EXISTS (
@@ -16,7 +16,7 @@ FOR SELECT USING (
   )
 );
 
--- Allow users to insert messages in chats they are part of
+DROP POLICY IF EXISTS "Users can insert messages in their chats" ON public.messages;
 CREATE POLICY "Users can insert messages in their chats" ON public.messages
 FOR INSERT WITH CHECK (
   auth.uid() = sender_id
@@ -27,68 +27,68 @@ FOR INSERT WITH CHECK (
   )
 );
 
--- Allow users to update their own messages
+DROP POLICY IF EXISTS "Users can update their own messages" ON public.messages;
 CREATE POLICY "Users can update their own messages" ON public.messages
 FOR UPDATE USING (auth.uid() = sender_id);
 
--- Allow users to delete their own messages
+DROP POLICY IF EXISTS "Users can delete their own messages" ON public.messages;
 CREATE POLICY "Users can delete their own messages" ON public.messages
 FOR DELETE USING (auth.uid() = sender_id);
 
 -- USERS POLICIES
--- Allow public read access to users (for search)
+DROP POLICY IF EXISTS "Public read access to users" ON public.users;
 CREATE POLICY "Public read access to users" ON public.users
 FOR SELECT USING (true);
 
--- Allow users to update their own profile
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" ON public.users
 FOR UPDATE USING (auth.uid() = id);
 
 -- CHATS POLICIES
--- Users can view their own chats
+DROP POLICY IF EXISTS "Users can view own chats" ON public.chats;
 CREATE POLICY "Users can view own chats" ON public.chats
 FOR SELECT USING (
   auth.uid() = participant_1_id OR auth.uid() = participant_2_id
 );
 
--- Users can create chats (matches)
+DROP POLICY IF EXISTS "Users can create chats" ON public.chats;
 CREATE POLICY "Users can create chats" ON public.chats
 FOR INSERT WITH CHECK (
   auth.uid() = participant_1_id OR auth.uid() = participant_2_id
 );
 
 -- LIKES POLICIES
--- Users can insert likes
+DROP POLICY IF EXISTS "Users can insert likes" ON public.likes;
 CREATE POLICY "Users can insert likes" ON public.likes
 FOR INSERT WITH CHECK (auth.uid() = from_user_id);
 
--- Users can view likes (to check matches)
+DROP POLICY IF EXISTS "Users can view likes" ON public.likes;
 CREATE POLICY "Users can view likes" ON public.likes
 FOR SELECT USING (
   auth.uid() = from_user_id OR auth.uid() = to_user_id
 );
 
 -- EVENTS POLICIES
--- Public read access to events
+DROP POLICY IF EXISTS "Public read access to events" ON public.events;
 CREATE POLICY "Public read access to events" ON public.events
 FOR SELECT USING (true);
 
--- Users can create events
+DROP POLICY IF EXISTS "Users can create events" ON public.events;
 CREATE POLICY "Users can create events" ON public.events
 FOR INSERT WITH CHECK (auth.uid() = created_by_id);
 
--- Users can delete their own events
+DROP POLICY IF EXISTS "Users can delete own events" ON public.events;
 CREATE POLICY "Users can delete own events" ON public.events
 FOR DELETE USING (auth.uid() = created_by_id);
 
--- STORAGE POLICIES (You need to run this in Supabase Storage dashboard or SQL editor)
+-- STORAGE POLICIES
 -- Create bucket 'images' if not exists
 INSERT INTO storage.buckets (id, name, public) VALUES ('images', 'images', true) ON CONFLICT DO NOTHING;
 
--- Policy to allow authenticated uploads
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 CREATE POLICY "Allow authenticated uploads" ON storage.objects
 FOR INSERT TO authenticated WITH CHECK (bucket_id = 'images');
 
--- Policy to allow public viewing
+DROP POLICY IF EXISTS "Allow public viewing" ON storage.objects;
 CREATE POLICY "Allow public viewing" ON storage.objects
 FOR SELECT TO public USING (bucket_id = 'images');
