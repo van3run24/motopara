@@ -140,8 +140,8 @@ function App() {
           <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-center mb-16">
             Живи <span className="text-orange-500">свободно</span>
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto">
-            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-7xl mx-auto auto-rows-fr">
+            <div className="group relative aspect-[4/3] md:aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
               <img 
                 src="/gallery/event.jpg" 
                 alt="Мото-события"
@@ -155,7 +155,7 @@ function App() {
               </div>
             </div>
             
-            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="group relative aspect-[4/3] md:aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
               <img 
                 src="/gallery/prohvat.jpg" 
                 alt="Прохват"
@@ -169,7 +169,7 @@ function App() {
               </div>
             </div>
             
-            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
+            <div className="group relative aspect-[4/3] md:aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
               <img 
                 src="/gallery/night.jpg" 
                 alt="Ночные катания"
@@ -183,7 +183,7 @@ function App() {
               </div>
             </div>
             
-            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02] md:col-span-2 md:row-span-2">
+            <div className="group relative aspect-[4/3] md:aspect-square lg:aspect-[4/3] lg:col-span-2 rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-orange-500/30 transition-all duration-300 hover:scale-[1.02]">
               <img 
                 src="/gallery/love.jpg" 
                 alt="Байкерские знакомства"
