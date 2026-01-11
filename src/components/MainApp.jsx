@@ -22,6 +22,14 @@ const MainApp = () => {
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
+  const getProfileImage = (user) => {
+    if (user.images && user.images.length > 0) return user.images[0];
+    if (user.image) return user.image;
+    return DEFAULT_AVATAR;
+  };
+
+  const [selectedImage, setSelectedImage] = useState(null);
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -77,7 +85,6 @@ const MainApp = () => {
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const [contextMenuMessageId, setContextMenuMessageId] = useState(null);
-  const [editingMessage, setEditingMessage] = useState(null);
   const messagesEndRef = useRef(null);
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -640,12 +647,6 @@ const MainApp = () => {
     }
   };
 
-  const handleEditMessage = (message) => {
-    setEditingMessage(message);
-    setMessageInput(message.text);
-    setContextMenuMessageId(null);
-  };
-
   const handleDeleteMessage = async (messageId) => {
     if (window.confirm('Удалить сообщение?')) {
       try {
@@ -696,10 +697,20 @@ const MainApp = () => {
                <Gauge size={14} />
        }));
        
+       // Combine all images (avatar + gallery)
+       let allImages = [];
+       if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+           allImages = data.images;
+       } else if (data.image) {
+           allImages = [data.image];
+       } else {
+           allImages = [DEFAULT_AVATAR];
+       }
+
        setViewingProfile({ 
          ...data, 
          interests: interestsWithIcons, 
-         images: (data.images && data.images.length > 0) ? data.images : (data.image ? [data.image] : [])
+         images: allImages
        });
 
     } catch (err) {
@@ -712,24 +723,9 @@ const MainApp = () => {
     if (!messageInput.trim() || !selectedChat) return;
 
     try {
-      if (editingMessage) {
-        // Edit existing message
-        await window.supabaseManager.editMessage(editingMessage.id, messageInput.trim());
-        
-        // Optimistic update
-        const updatedMessages = selectedChat.messages.map(m => 
-          m.id === editingMessage.id ? { ...m, text: messageInput.trim(), is_edited: true } : m
-        );
-        const updatedChat = { ...selectedChat, messages: updatedMessages };
-        
-        setSelectedChat(updatedChat);
-        setChats(prevChats => prevChats.map(c => c.id === selectedChat.id ? updatedChat : c));
-        setEditingMessage(null);
-      } else {
-        // Send new message
-        if (window.supabaseManager) {
-          await window.supabaseManager.sendMessage(selectedChat.id, messageInput.trim());
-        }
+      // Send new message
+      if (window.supabaseManager) {
+        await window.supabaseManager.sendMessage(selectedChat.id, messageInput.trim());
       }
       
       setMessageInput('');
@@ -808,6 +804,26 @@ const MainApp = () => {
             <User size={20} className={activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-400'} />
           </button>
         </header>
+      )}
+
+      {/* Full Screen Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <img 
+            src={selectedImage} 
+            className="max-w-full max-h-full object-contain rounded-lg"
+            alt="Full screen"
+          />
+          <button 
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 p-2 bg-white/10 rounded-full text-white hover:bg-white/20"
+          >
+            <X size={24} />
+          </button>
+        </div>
       )}
 
       <main className="flex-1 relative overflow-hidden">
@@ -1194,7 +1210,7 @@ const MainApp = () => {
                           }`}
                         >
                           <div className="relative">
-                            <img src={chat.image} className={`w-14 h-14 rounded-[22px] object-cover ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`} alt="" />
+                            <img src={chat.image || DEFAULT_AVATAR} className={`w-14 h-14 rounded-[22px] object-cover ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`} alt="" />
                             {chat.online && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>}
                             {chat.unreadCount > 0 && <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-600 rounded-full border-4 border-black flex items-center justify-center text-[10px] font-black">{chat.unreadCount}</div>}
                           </div>
@@ -1270,13 +1286,7 @@ const MainApp = () => {
                 className="flex items-center gap-3 text-left active:opacity-70 transition-opacity"
                 onClick={() => selectedChat.partnerId && handleOpenProfile(selectedChat.partnerId)}
               >
-                {selectedChat.image ? (
-                  <img src={selectedChat.image} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
-                ) : (
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/10">
-                    <User size={20} className="text-zinc-500" />
-                  </div>
-                )}
+                  <img src={selectedChat.image || DEFAULT_AVATAR} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
                 <div>
                 <h4 className="font-bold text-sm uppercase italic">{selectedChat.name || 'Пользователь'}</h4>
                   {selectedChat.online && <p className="text-[9px] text-green-500 font-bold uppercase">В сети</p>}
@@ -1289,7 +1299,7 @@ const MainApp = () => {
               {selectedChat.messages.map((msg, idx) => (
                     <div 
                         key={msg.id || idx} 
-                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'} ${editingMessage?.id === msg.id ? 'ring-2 ring-orange-500 rounded-2xl' : ''}`}
+                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
                         onClick={() => {
                             if (msg.sender === 'me') {
                                 setContextMenuMessageId(contextMenuMessageId === msg.id ? null : msg.id);
@@ -1299,12 +1309,6 @@ const MainApp = () => {
                       {/* Context Menu for Edit/Delete */}
                       {contextMenuMessageId === msg.id && msg.sender === 'me' && (
                           <div className="absolute bottom-full right-0 mb-2 bg-[#1c1c1e] border border-white/10 rounded-xl p-2 shadow-2xl z-50 flex flex-col gap-1 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
-                              <button 
-                                  onClick={(e) => { e.stopPropagation(); handleEditMessage(msg); }}
-                                  className="flex items-center gap-2 px-3 py-2 hover:bg-white/10 rounded-lg text-sm text-zinc-200 transition-colors text-left"
-                              >
-                                  <Edit3 size={14} /> Редактировать
-                              </button>
                               <button 
                                   onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
                                   className="flex items-center gap-2 px-3 py-2 hover:bg-red-500/20 text-red-500 rounded-lg text-sm transition-colors text-left"
@@ -1319,7 +1323,8 @@ const MainApp = () => {
                             <img 
                               src={msg.image} 
                               alt="Sent" 
-                              className={`rounded-2xl ${msg.sender === 'me' ? 'rounded-br-none' : 'rounded-bl-none'} max-w-full h-auto cursor-pointer active:opacity-80 transition-opacity`}
+                              onClick={() => setSelectedImage(msg.image)}
+                              className={`rounded-2xl ${msg.sender === 'me' ? 'rounded-br-none' : 'rounded-bl-none'} max-w-[200px] h-auto cursor-pointer active:opacity-80 transition-opacity`}
                             />
                             <div className={`absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md flex items-center gap-1`}>
                                 <span className="text-[9px] text-white/90 font-medium">
@@ -1962,7 +1967,7 @@ const MainApp = () => {
                 <div className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
                   <div className="relative aspect-[3/4] overflow-hidden mb-4">
                     <img 
-                      src={viewingProfile.images && viewingProfile.images.length > 0 ? viewingProfile.images[0] : (viewingProfile.image || DEFAULT_AVATAR)} 
+                      src={viewingProfile.images && viewingProfile.images.length > 0 ? viewingProfile.images[0] : DEFAULT_AVATAR} 
                       className="w-full h-full object-cover" 
                       alt="" 
                     />
