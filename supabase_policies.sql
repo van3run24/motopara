@@ -5,6 +5,17 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
+-- Add is_read column to messages table if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='messages' AND column_name='is_read'
+    ) THEN
+        ALTER TABLE public.messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+
 -- MESSAGES POLICIES
 DROP POLICY IF EXISTS "Users can view messages in their chats" ON public.messages;
 CREATE POLICY "Users can view messages in their chats" ON public.messages
@@ -48,7 +59,7 @@ FOR UPDATE USING (
 
 -- ALLOW READ STATUS UPDATES (Safe RPC function)
 -- This function allows updating is_read status for messages in a chat where the user is a participant
-CREATE OR REPLACE FUNCTION mark_messages_read(p_chat_id bigint)
+CREATE OR REPLACE FUNCTION mark_messages_read(p_chat_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
