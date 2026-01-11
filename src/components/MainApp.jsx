@@ -1288,21 +1288,23 @@ const MainApp = () => {
                                     {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
                                 </span>
                                 {msg.sender === 'me' && (
-                                    <CheckCheck size={10} className="text-white/90" />
-                                )}
+                                     msg.is_read ? <CheckCheck size={10} className="text-white/90" /> : <Check size={10} className="text-white/90" />
+                                 )}
                             </div>
                         </div>
                       ) : (
-                        <div className={`px-3 py-2 rounded-2xl text-sm border relative min-w-[60px] ${msg.sender === 'me' ? 'bg-[#ff9500]/10 border-[#ff9500]/20 text-white rounded-br-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-bl-none'}`}>
-                          <span className="leading-relaxed break-words whitespace-pre-wrap">{msg.text || ''}</span>
-                          {msg.is_edited && <span className="text-[9px] opacity-60 ml-1">(ред.)</span>}
-                          <div className={`float-right ml-2 mt-1 flex items-center gap-1 select-none ${msg.sender === 'me' ? 'text-orange-500/60' : 'text-zinc-500'}`}>
-                             <span className="text-[9px] font-medium">
-                                {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
-                             </span>
-                             {msg.sender === 'me' && (
-                                <CheckCheck size={12} />
-                             )}
+                        <div className={`px-3 py-2 rounded-2xl text-sm border relative min-w-[80px] ${msg.sender === 'me' ? 'bg-orange-600 border-orange-600 text-white rounded-br-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-bl-none'}`}>
+                          <div className="flex flex-wrap gap-x-2 items-end">
+                            <span className="leading-relaxed break-words whitespace-pre-wrap">{msg.text || ''}</span>
+                            {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(ред.)</span>}
+                            <div className={`flex items-center gap-1 select-none ml-auto h-4 ${msg.sender === 'me' ? 'text-white/70' : 'text-zinc-500'}`}>
+                               <span className="text-[9px] font-medium">
+                                  {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                               </span>
+                               {msg.sender === 'me' && (
+                                  msg.is_read ? <CheckCheck size={12} /> : <Check size={12} />
+                               )}
+                            </div>
                           </div>
                         </div>
                       )}
