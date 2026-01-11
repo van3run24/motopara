@@ -138,8 +138,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .from('chats')
         .select(`
           *,
-          participant_1:participant_1_id(name, image),
-          participant_2:participant_2_id(name, image)
+          participant_1:participant_1_id(name, image, location_updated_at),
+          participant_2:participant_2_id(name, image, location_updated_at)
         `)
         .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`);
       
@@ -154,17 +154,20 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             .eq('chat_id', chat.id)
             .order('created_at', { ascending: true });
           
+          const partner = chat.participant_1_id === userId ? chat.participant_2 : chat.participant_1;
+          const isOnline = partner?.location_updated_at && (new Date() - new Date(partner.location_updated_at) < 15 * 60 * 1000);
+
           return {
             ...chat,
             messages: messages?.map(m => ({
               ...m,
               sender: m.sender_id === userId ? 'me' : 'other'
             })) || [],
-            name: chat.participant_1_id === userId ? (chat.participant_2?.name || 'Неизвестный пользователь') : (chat.participant_1?.name || 'Неизвестный пользователь'),
-            image: chat.participant_1_id === userId ? (chat.participant_2?.image || null) : (chat.participant_1?.image || null),
-            lastMessage: messages?.length > 0 
-              ? (messages[messages.length - 1].type === 'image' ? '📷 Фотография' : (messages[messages.length - 1].text || 'Сообщение'))
-              : 'Начните общение',
+            name: partner?.name || 'Неизвестный пользователь',
+            image: partner?.image || null,
+            online: isOnline,
+            partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
+            lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
             time: messages?.[messages.length - 1]?.created_at ? 
               new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
               ''
@@ -220,7 +223,32 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     return () => clearInterval(interval);
   }, []);
 
-  // Real-time subscriptions
+  // Real-time подписка на сообщения
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const subscription = supabase
+      .channel('messages')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'messages'
+        }, 
+        (payload) => {
+          console.log('Message update:', payload);
+          loadChats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Real-time подписка на новые чаты
   useEffect(() => {
     const userId = localStorage.getItem('userId');
     if (!userId) return;
@@ -234,65 +262,32 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           table: 'chats'
         }, 
         (payload) => {
-          // console.log('New chat:', payload);
-          // Use loose comparison for IDs and add delay to ensure consistency
-          if (payload.new.participant_1_id == userId || payload.new.participant_2_id == userId) {
-            setTimeout(() => {
-              loadChats();
-              loadUsers();
-            }, 1000);
+          console.log('New chat:', payload);
+          if (payload.new.participant_1_id === userId || payload.new.participant_2_id === userId) {
+            loadChats();
+            loadUsers();
           }
         }
       )
       .subscribe();
 
-    const messageSubscription = supabase
-      .channel('messages')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'messages'
-        }, 
-        (payload) => {
-          // console.log('Message update:', payload);
-          // Add delay to ensure transaction visibility
-          setTimeout(() => loadChats(), 500);
-        }
-      )
-      .subscribe();
-
-    // Polling fallback to ensure data consistency
-    const interval = setInterval(() => {
-      loadChats();
-      loadUsers();
-    }, 30000);
-
     return () => {
-      supabase.removeChannel(subscription);
-      supabase.removeChannel(messageSubscription);
-      clearInterval(interval);
+      subscription.unsubscribe();
     };
   }, []);
 
   // Экспортируем функции для использования в MainApp
   window.supabaseManager = {
-    sendMessage: async (chatId, text, type = 'text', image = null) => {
+    sendMessage: async (chatId, text) => {
       const userId = localStorage.getItem('userId');
-      const messageData = {
-        chat_id: chatId,
-        sender_id: userId,
-        text: text,
-        type: type
-      };
-      
-      if (image) {
-        messageData.image = image;
-      }
-
       const { data, error } = await supabase
         .from('messages')
-        .insert([messageData])
+        .insert([{
+          chat_id: chatId,
+          sender_id: userId,
+          text: text,
+          type: 'text'
+        }])
         .select()
         .single();
       

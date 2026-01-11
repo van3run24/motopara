@@ -17,16 +17,6 @@ L.Icon.Default.mergeOptions({
 });
 
 const MainApp = () => {
-  // Custom Icon for User
-  const userIcon = new L.Icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
   const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
   const [userLocation, setUserLocation] = useState(null);
@@ -91,6 +81,7 @@ const MainApp = () => {
   const messagesEndRef = useRef(null);
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [viewingProfile, setViewingProfile] = useState(null);
   
   // Settings States
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -112,7 +103,17 @@ const MainApp = () => {
   // Данные пользователя
   const [userData, setUserData] = useState(null);
 
-  const [swipedUserIds, setSwipedUserIds] = useState(new Set());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // const cities = ["Москва", "Санкт-Петербург", "Сочи", "Краснодар"]; // Removed hardcoded cities
+
+  // Состояния для свайпов в стиле Tinder
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [exitDirection, setExitDirection] = useState(null);
+  const cardRef = useRef(null);
+  const profileScrollRef = useRef(null); // Ref for resetting scroll
 
   // Фильтруем анкеты: используем данные из Supabase
   const matchedIds = chats.map(chat => {
@@ -126,38 +127,13 @@ const MainApp = () => {
   const filteredBikers = userData ? bikers.filter(b => 
     b.city === userData.city && 
     b.gender !== userData.gender && 
-    !matchedIds.includes(b.id) &&
-    !swipedUserIds.has(b.id)
+    !matchedIds.includes(b.id)
   ) : [];
   
-  // Всегда берем первого доступного байкера
-  const currentBiker = filteredBikers.length > 0 ? filteredBikers[0] : null;
-
-  // Sync new matches from chats (chats with no messages are considered new matches)
-  useEffect(() => {
-    if (chats.length > 0) {
-      const freshChats = chats.filter(c => c.messages.length === 0);
-      setNewMatches(prev => {
-        const existingIds = new Set(prev.map(m => m.id));
-        const added = freshChats
-          .filter(c => !existingIds.has(c.id))
-          .map(c => ({
-             id: c.id,
-             name: c.name,
-             image: c.image,
-             isNew: true
-          }));
-        
-        // Remove matches that have become chats with messages
-        const validPrev = prev.filter(m => {
-           const chat = chats.find(c => c.id === m.id || c.name === m.name);
-           return !chat || chat.messages.length === 0;
-        });
-
-        return [...added, ...validPrev];
-      });
-    }
-  }, [chats]);
+  // Безопасное получение currentBiker с проверкой на существование
+  const currentBiker = filteredBikers.length > 0 && currentIndex >= 0 && currentIndex < filteredBikers.length 
+    ? filteredBikers[currentIndex] 
+    : null;
 
   const [userImages, setUserImages] = useState(() => {
     // Инициализация из localStorage при первом рендере
@@ -279,19 +255,25 @@ const MainApp = () => {
     fetchUserProfile();
   }, []);
   
-  // Обновление индекса при изменении города (сброс свайпов)
+  // Обновление индекса при изменении города
   useEffect(() => {
-    if (userData?.city) {
-      setSwipedUserIds(new Set());
+    if (filteredBikers.length > 0) {
+      if (currentIndex >= filteredBikers.length || currentIndex < 0) {
+        setCurrentIndex(0);
+      }
+      setCurrentImageIndex(0);
+    } else {
+      // Если нет доступных байкеров, сбрасываем индекс
+      setCurrentIndex(0);
       setCurrentImageIndex(0);
     }
-  }, [userData?.city]);
+  }, [userData?.city, filteredBikers.length, currentIndex]);
 
   const handleNext = () => {
-    if (currentBiker) {
+    if (filteredBikers.length > 0) {
       setExitDirection('left');
       setTimeout(() => {
-          setSwipedUserIds(prev => new Set([...prev, currentBiker.id]));
+          setCurrentIndex((prev) => prev + 1);
           setCurrentImageIndex(0);
           setDragOffset({ x: 0, y: 0 });
           setExitDirection(null);
@@ -309,7 +291,7 @@ const MainApp = () => {
     setExitDirection('right');
     
     setTimeout(() => {
-        setSwipedUserIds(prev => new Set([...prev, likedUser.id]));
+        setCurrentIndex((prev) => prev + 1);
         setCurrentImageIndex(0);
         setDragOffset({ x: 0, y: 0 });
         setExitDirection(null);
@@ -330,7 +312,8 @@ const MainApp = () => {
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
             online: true,
             unreadCount: 1,
-            messages: []
+            messages: [],
+            partnerId: likedUser.id
           };
           setChats(prev => [...prev, chatData]);
           
@@ -525,17 +508,27 @@ const MainApp = () => {
           const newImages = [...userImages, imageUrl];
           await updateGallery(newImages);
         } else {
-          // Загрузка фото в чат
-          try {
-             const imageUrl = await userService.uploadChatImage(userId, file);
-             
-             if (selectedChat && window.supabaseManager) {
-                 await window.supabaseManager.sendMessage(selectedChat.id, '', 'image', imageUrl);
-             }
-          } catch (e) {
-             console.error('Error uploading chat image:', e);
-             alert('Не удалось отправить фото');
-          }
+          // Загрузка фото в чат (пока локально)
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (!selectedChat) return;
+            const imageMessage = {
+              id: Date.now(),
+              text: '',
+              sender: 'me',
+              image: reader.result,
+              type: 'image'
+            };
+            const updatedChat = {
+              ...selectedChat,
+              messages: [...selectedChat.messages, imageMessage],
+              lastMessage: 'Фото',
+              time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            };
+            setSelectedChat(updatedChat);
+            setChats(chats.map(c => c.id === selectedChat.id ? updatedChat : c));
+          };
+          reader.readAsDataURL(file);
         }
       } catch (err) {
         console.error('Error uploading image:', err);
@@ -680,6 +673,50 @@ const MainApp = () => {
       }
     }
     setContextMenuMessageId(null);
+  };
+
+  const handleOpenProfile = async (partnerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', partnerId)
+        .single();
+      
+      if (error) throw error;
+      
+       let interests = data.interests;
+       if (typeof interests === 'string') {
+         try { interests = JSON.parse(interests); } catch (e) {}
+       }
+       if (!interests || !Array.isArray(interests)) {
+          interests = [
+            { id: 'style', label: 'Стиль', value: data.temp || 'Спорт', icon: 'Gauge' },
+            { id: 'music', label: 'Музыка', value: data.music || 'Rock', icon: 'Music' },
+            { id: 'equip', label: 'Экип', value: data.equip || 'Full', icon: 'Shield' },
+            { id: 'goal', label: 'Цель', value: data.goal || 'Катка', icon: 'Target' }
+          ];
+       }
+       
+       const interestsWithIcons = interests.map(i => ({
+         ...i,
+         icon: i.icon === 'Gauge' ? <Gauge size={14} /> :
+               i.icon === 'Music' ? <Music size={14} /> :
+               i.icon === 'Shield' ? <Shield size={14} /> :
+               i.icon === 'Target' ? <Target size={14} /> :
+               <Gauge size={14} />
+       }));
+       
+       setViewingProfile({ 
+         ...data, 
+         interests: interestsWithIcons, 
+         images: (data.images && data.images.length > 0) ? data.images : (data.image ? [data.image] : [])
+       });
+
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      // alert("Не удалось загрузить профиль");
+    }
   };
 
   const sendMessage = async () => {
@@ -902,7 +939,7 @@ const MainApp = () => {
                   </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleLike(); }} 
-                    className="w-20 h-20 rounded-full bg-orange-500 bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-2xl active:scale-90 hover:scale-105 transition-all relative z-50"
+                    className="w-20 h-20 rounded-full bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-2xl active:scale-90 hover:scale-105 transition-all relative z-50"
                   >
                     <Heart fill="white" size={36} className="text-white" />
                   </button>
@@ -913,6 +950,12 @@ const MainApp = () => {
                 <Search size={48} className="text-zinc-800 mb-4" />
                 <p className="text-zinc-600 text-sm italic uppercase tracking-wider mb-2">
                   {filteredBikers.length === 0 ? 'Нет анкет в этом городе' : 'Анкеты закончились'}
+                </p>
+                <p className="text-zinc-700 text-xs">
+                  {filteredBikers.length === 0 
+                    ? 'Попробуйте изменить город в настройках' 
+                    : 'Зайдите позже, появятся новые'
+                  }
                 </p>
               </div>
             )}
@@ -940,42 +983,32 @@ const MainApp = () => {
                     attribution=""
                   />
                   {/* User Marker */}
-                   <Marker 
-                    position={userLocation ? [userLocation.lat, userLocation.lng] : [
-                      cities.find(c => c.name === userData.city)?.lat || 55.7558, 
-                      cities.find(c => c.name === userData.city)?.lng || 37.6173
-                    ]}
-                    icon={userIcon}
-                   >
+                   <Marker position={userLocation ? [userLocation.lat, userLocation.lng] : [
+                    cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                    cities.find(c => c.name === userData.city)?.lng || 37.6173
+                   ]}>
                       <Popup className="custom-popup">
-                       <div className="text-black font-bold">Вы здесь</div>
+                         <div className="text-black font-bold">Вы здесь</div>
                       </Popup>
                    </Marker>
                    
                    {/* Bikers Markers */}
-                   {/* Bikers Markers */}
-                   {filteredBikers.filter(b => b.city === userData?.city).map((b) => {
+                   {bikers.filter(b => b.city === userData?.city).map((b, idx) => {
                       const cityCoords = cities.find(c => c.name === userData.city) || { lat: 55.7558, lng: 37.6173 };
+                      // Pseudo-random position based on ID to be consistent across renders
+                      const seed = b.id.charCodeAt(0); 
+                      const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
+                      const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
                       
-                      let position;
-                      if (b.latitude && b.longitude) {
-                          position = [b.latitude, b.longitude];
-                      } else {
-                          // Pseudo-random position based on ID
-                          const seed = b.id.charCodeAt(0); 
-                          const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
-                          const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
-                          position = [cityCoords.lat + latOffset, cityCoords.lng + lngOffset];
-                      }
-                          
                       return (
-                        <Marker key={b.id} position={position}>
+                        <Marker key={b.id} position={[cityCoords.lat + latOffset, cityCoords.lng + lngOffset]}>
                           <Popup className="custom-popup">
-                            <div className="w-48 bg-black/90 backdrop-blur-xl border border-white/10 flex flex-col">
+                            <div className="w-48 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10 flex flex-col">
                                <div className="h-32 w-full relative shrink-0">
-                                  <img src={b.images?.[0] || b.image} className="w-full h-full object-cover" alt={b.name} />
+                                  <img src={b.images[0] || DEFAULT_AVATAR} className="w-full h-full object-cover" alt={b.name}/>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
                                   <div className="absolute bottom-2 left-3">
-                                     <span className="font-black italic uppercase text-lg leading-none block text-white">{b.name}, {b.age}</span>
+                                     <span className="font-black italic uppercase text-lg leading-none block">{b.name}, {b.age}</span>
                                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{b.has_bike ? b.bike : "Ищу того, кто прокатит"}</span>
                                   </div>
                                </div>
@@ -1244,7 +1277,10 @@ const MainApp = () => {
           <div className="absolute inset-0 bg-black z-50 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="h-20 shrink-0 border-b border-white/5 flex items-center px-6 gap-4 bg-black/80 backdrop-blur-xl">
               <button onClick={() => { setSelectedChat(null); setMessageInput(''); }} className="p-2 bg-white/5 rounded-xl active:scale-90 transition-all"><ChevronLeft size={20}/></button>
-              <div className="flex items-center gap-3">
+              <button 
+                className="flex items-center gap-3 text-left active:opacity-70 transition-opacity"
+                onClick={() => selectedChat.partnerId && handleOpenProfile(selectedChat.partnerId)}
+              >
                 {selectedChat.image ? (
                   <img src={selectedChat.image} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
                 ) : (
@@ -1256,7 +1292,7 @@ const MainApp = () => {
                 <h4 className="font-bold text-sm uppercase italic">{selectedChat.name || 'Пользователь'}</h4>
                   {selectedChat.online && <p className="text-[9px] text-green-500 font-bold uppercase">В сети</p>}
                 </div>
-              </div>
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col scrollbar-hide">
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
@@ -1309,7 +1345,7 @@ const MainApp = () => {
                         <div className={`px-3 py-2 rounded-2xl text-sm border relative min-w-[80px] ${msg.sender === 'me' ? 'bg-orange-600 border-orange-600 text-white rounded-br-none' : 'bg-[#2c2c2e] border-white/5 text-zinc-200 rounded-bl-none'}`}>
                           <div className="flex flex-wrap gap-x-2 items-end">
                             <span className="leading-relaxed break-words whitespace-pre-wrap">{msg.text || ''}</span>
-                            {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(ред.)</span>}
+                            {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(изменено)</span>}
                             <div className={`flex items-center gap-1 select-none ml-auto h-4 ${msg.sender === 'me' ? 'text-white/70' : 'text-zinc-500'}`}>
                                <span className="text-[9px] font-medium">
                                   {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -1880,7 +1916,7 @@ const MainApp = () => {
                       type="date" 
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-sm outline-none focus:border-orange-500 text-center appearance-none min-w-0"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
                     />
                   </div>
                   <div className="flex-1">
@@ -1889,7 +1925,7 @@ const MainApp = () => {
                       type="time" 
                       value={newEvent.time}
                       onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-sm outline-none focus:border-orange-500 text-center appearance-none min-w-0"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500 text-center"
                     />
                   </div>
                 </div>
@@ -1921,6 +1957,68 @@ const MainApp = () => {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* VIEW PROFILE MODAL */}
+        {viewingProfile && (
+          <div className="absolute inset-0 bg-black z-[100] p-4 flex flex-col animate-in slide-in-from-right duration-300">
+             <div className="flex items-center gap-4 mb-4">
+                <button onClick={() => setViewingProfile(null)} className="p-2 bg-white/5 rounded-xl"><ChevronLeft size={24}/></button>
+                <h2 className="text-xl font-black uppercase italic">Анкета</h2>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
+                  <div className="relative aspect-[3/4] rounded-[32px] overflow-hidden mb-4">
+                    <img 
+                      src={viewingProfile.images && viewingProfile.images.length > 0 ? viewingProfile.images[0] : (viewingProfile.image || DEFAULT_AVATAR)} 
+                      className="w-full h-full object-cover" 
+                      alt="" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
+                    <div className="absolute bottom-0 left-0 p-8 w-full">
+                      <h2 className="text-4xl font-black uppercase italic leading-none mb-2">{viewingProfile.name}</h2>
+                      <div className="flex items-center gap-2 text-zinc-300 font-medium mb-4">
+                        <MapPin size={16} className="text-orange-500" />
+                        <span className="uppercase tracking-widest text-xs">{viewingProfile.city || 'Не указан'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {viewingProfile.interests && viewingProfile.interests.map((item) => (
+                      <div key={item.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-orange-500">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <div className="text-[9px] uppercase font-black text-zinc-500 tracking-wider mb-0.5">{item.label}</div>
+                          <div className="font-bold text-sm">{item.value}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {viewingProfile.description && (
+                    <div className="bg-white/5 border border-white/10 p-6 rounded-[32px] mb-4">
+                      <div className="text-[10px] uppercase font-black text-zinc-500 tracking-wider mb-3 flex items-center gap-2">
+                        <Info size={14} />
+                        О себе
+                      </div>
+                      <p className="text-zinc-300 leading-relaxed font-medium">{viewingProfile.description}</p>
+                    </div>
+                  )}
+                  
+                  {viewingProfile.images && viewingProfile.images.length > 1 && (
+                     <div className="space-y-4 mb-4">
+                        {viewingProfile.images.slice(1).map((img, idx) => (
+                           <div key={idx} className="rounded-[32px] overflow-hidden border border-white/10">
+                              <img src={img} className="w-full h-full object-cover" alt="" />
+                           </div>
+                        ))}
+                     </div>
+                  )}
+              </div>
           </div>
         )}
       </main>
