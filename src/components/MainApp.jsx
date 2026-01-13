@@ -1211,11 +1211,93 @@ const MainApp = () => {
           </div>
         )}
 
-        {/* КАРТА - ВРЕМЕННО ОТКЛЮЧЕНА */}
+        {/* КАРТА */}
         {activeTab === 'map' && (
-          <div className="h-full flex items-center justify-center py-16">
-            <p className="text-zinc-600 text-sm italic uppercase tracking-wider mb-4">Карта временно отключена</p>
-            <p className="text-zinc-500 text-xs">Идет технические работы</p>
+          <div className="h-full overflow-y-auto bg-black animate-in fade-in">
+            <div className={`relative bg-[#0a0a0a] ${isFullscreenMap ? 'fixed inset-0 z-50 m-0 rounded-none' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isFullscreenMap ? '100vh' : '40vh', minHeight: isFullscreenMap ? '100vh' : '300px' }}>
+              {/* Кнопка полноэкранного режима */}
+              <button
+                onClick={() => setIsFullscreenMap(!isFullscreenMap)}
+                className="absolute top-4 right-4 z-[20] bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                {isFullscreenMap ? <X size={18} className="text-white" /> : <Navigation size={18} className="text-white" />}
+              </button>
+              
+              {userData && (
+                <MapContainer 
+                  center={userLocation ? [userLocation.lat, userLocation.lng] : [
+                    cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                    cities.find(c => c.name === userData.city)?.lng || 37.6173
+                  ]} 
+                  zoom={isFullscreenMap ? 12 : 11} 
+                  style={{ height: '100%', width: '100%' }}
+                  className="z-0"
+                  attributionControl={false}
+                >
+                  <TileLayer
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    attribution=""
+                  />
+                  {/* User Marker */}
+                   <Marker 
+                     position={userLocation ? [userLocation.lat, userLocation.lng] : [
+                       cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                       cities.find(c => c.name === userData.city)?.lng || 37.6173
+                     ]} 
+                     icon={userIcon}
+                   >
+                      <Popup className="custom-popup">
+                         <div className="text-black font-bold">Вы здесь</div>
+                      </Popup>
+                   </Marker>
+                   
+                   {/* Bikers Markers */}
+                   {bikers.filter(b => b.city === userData?.city).map((b, idx) => {
+                      const cityCoords = cities.find(c => c.name === userData.city) || { lat: 55.7558, lng: 37.6173 };
+                      // Pseudo-random position based on ID to be consistent across renders
+                      const seed = b.id.charCodeAt(0); 
+                      const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
+                      const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
+                      
+                      // Определяем иконку по полу
+                      const icon = b.gender === 'female' ? femaleIcon : maleIcon;
+                      
+                      return (
+                        <Marker key={b.id} position={[cityCoords.lat + latOffset, cityCoords.lng + lngOffset]} icon={icon}>
+                          <Popup className="custom-popup">
+                            <div className="w-48 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10 flex flex-col">
+                               <div className="h-32 w-full relative shrink-0">
+                                  <img src={b.images[0] || DEFAULT_AVATAR} className="w-full h-full object-cover" alt={b.name}/>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
+                                  <div className="absolute bottom-2 left-3">
+                                     <span className="font-black italic uppercase text-lg leading-none block">{b.name}, {b.age}</span>
+                                     <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">{b.has_bike ? b.bike : "Ищу того, кто прокатит"}</span>
+                                  </div>
+                               </div>
+                               <button 
+                                 onClick={() => { setCurrentIndex(bikers.indexOf(b)); setActiveTab('search'); }}
+                                 className="w-full py-3 text-orange-500 font-bold uppercase text-[10px] tracking-widest hover:bg-white/5 transition-colors"
+                               >
+                                 Открыть анкету
+                               </button>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                   })}
+                </MapContainer>
+              )}
+              
+              {!isFullscreenMap && (
+                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
+                  <Navigation className="text-orange-500" size={18} />
+                  <div>
+                    <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
