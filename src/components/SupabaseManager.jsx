@@ -226,10 +226,14 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
   // Загрузка событий
   const loadEvents = async () => {
     try {
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
+      const currentTime = today.toTimeString().slice(0, 5); // HH:MM format
+      
       const { data: events, error } = await supabase
         .from('events')
         .select('*')
-        .gte('date', new Date().toISOString().split('T')[0]) // Только будущие и сегодняшние события
+        .or(`date.gt.${todayString},and(date.eq.${todayString},time.gt.${currentTime})`) // Только будущие события или сегодня в будущем
         .order('date', { ascending: true })
         .order('time', { ascending: true });
       
@@ -238,11 +242,11 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       // Автоудаление прошедших событий
       const { error: deleteError } = await supabase
         .from('events')
-        .select()
-        .lt('date', new Date().toISOString().split('T')[0]);
+        .delete()
+        .or(`date.lt.${todayString},and(date.eq.${todayString},time.lt.${currentTime})`);
         
       if (deleteError) {
-        console.error('Error deleting old events:', deleteError);
+        console.error('Error deleting past events:', deleteError);
       } else {
         console.log('Deleted past events');
       }
@@ -272,6 +276,40 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         updateUserLocation();
       }
     }, 300000); // 5 минут
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Периодическая очистка прошедших событий (каждые 10 минут)
+  useEffect(() => {
+    const cleanupEvents = async () => {
+      try {
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0];
+        const currentTime = today.toTimeString().slice(0, 5);
+        
+        const { error: deleteError } = await supabase
+          .from('events')
+          .delete()
+          .or(`date.lt.${todayString},and(date.eq.${todayString},time.lt.${currentTime})`);
+          
+        if (deleteError) {
+          console.error('Error cleaning up past events:', deleteError);
+        } else {
+          console.log('Cleaned up past events');
+          // Перезагружаем события после очистки
+          loadEvents();
+        }
+      } catch (err) {
+        console.error('Error in event cleanup:', err);
+      }
+    };
+
+    // Запускаем сразу
+    cleanupEvents();
+    
+    // Затем каждые 10 минут
+    const interval = setInterval(cleanupEvents, 600000); // 10 минут
 
     return () => clearInterval(interval);
   }, []);
