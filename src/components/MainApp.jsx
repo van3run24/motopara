@@ -518,6 +518,7 @@ const MainApp = () => {
 
   const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
   const fileInputRef = useRef(null);
+  const profileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const chatFileInputRef = useRef(null);
 
@@ -927,6 +928,11 @@ const MainApp = () => {
                 // Обновляем состояние аватара
                 setUserData(prev => ({...prev, image: imageUrl}));
                 
+                // Принудительно обновляем компонент для сброса кэша изображения
+                setTimeout(() => {
+                    setUserData(prev => ({...prev}));
+                }, 100);
+                
                 // Добавляем аватар в галерею с задержкой
                 setTimeout(async () => {
                     if (!userImages.includes(imageUrl)) {
@@ -983,6 +989,8 @@ const MainApp = () => {
         alert('Ошибка загрузки фото: ' + err.message);
     } finally {
         setIsUploading(false); // Завершаем загрузку в любом случае
+        // Очищаем значение input для возможности повторной загрузки того же файла
+        e.target.value = '';
     }
   };
 
@@ -2098,7 +2106,7 @@ const MainApp = () => {
             <>
             <div className="relative mb-8">
               <button 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => profileInputRef.current?.click()}
                 className="w-32 h-32 rounded-[44px] bg-gradient-to-tr from-orange-600 to-yellow-500 p-1 cursor-pointer hover:opacity-90 transition-opacity active:scale-95"
               >
                 <div className="w-full h-full rounded-[42px] bg-zinc-900 flex items-center justify-center overflow-hidden border-4 border-black">
@@ -2234,7 +2242,7 @@ const MainApp = () => {
                   <label className="text-[10px] font-black text-zinc-600 uppercase">Фото профиля</label>
                   <input 
                     type="file" 
-                    ref={fileInputRef}
+                    ref={profileInputRef}
                     accept="image/*"
                     onChange={(e) => handleImageUpload(e, true)}
                     className="hidden"
@@ -2250,7 +2258,7 @@ const MainApp = () => {
                       )}
                     </div>
                     <button
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => profileInputRef.current?.click()}
                       disabled={isUploading}
                       className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -2300,7 +2308,7 @@ const MainApp = () => {
                       })}
                     </div>
                     <button
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => galleryInputRef.current?.click()}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
                       <Plus size={16} />

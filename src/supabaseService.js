@@ -75,15 +75,17 @@ export const userService = {
        throw error;
     }
     
-    // Получаем публичный URL
+    // Получаем публичный URL с временной меткой для предотвращения кэширования
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(fileName);
+    
+    const timestampedUrl = `${publicUrl}?t=${Date.now()}`;
       
     // Обновляем ссылку на фото в профиле пользователя
-    await this.updateUser(userId, { image: publicUrl });
+    await this.updateUser(userId, { image: timestampedUrl });
     
-    return publicUrl;
+    return timestampedUrl;
   },
 
   // Загрузка фото в галерею
@@ -103,12 +105,14 @@ export const userService = {
        throw error;
     }
     
-    // Получаем публичный URL
+    // Получаем публичный URL с временной меткой для предотвращения кэширования
     const { data: { publicUrl } } = supabase.storage
       .from('gallery')
       .getPublicUrl(fileName);
     
-    return publicUrl;
+    const timestampedUrl = `${publicUrl}?t=${Date.now()}`;
+    
+    return timestampedUrl;
   }
 };
 
