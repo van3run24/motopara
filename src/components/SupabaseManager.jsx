@@ -276,6 +276,119 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     return () => clearInterval(interval);
   }, []);
 
+  // Real-time подписка на лайки
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const subscription = supabase
+      .channel('likes')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'likes'
+        }, 
+        (payload) => {
+          console.log('New like:', payload);
+          // Если лайк поставили текущему пользователю
+          if (payload.new.to_user_id === userId) {
+            // Загружаем информацию о том, кто лайкнул
+            const loadLikerInfo = async () => {
+              const { data: liker } = await supabase
+                .from('users')
+                .select('name, image')
+                .eq('id', payload.new.from_user_id)
+                .single();
+              
+              if (liker) {
+                // Локальное уведомление
+                window.supabaseManager.sendNotification(
+                  '❤️ Новый лайк!',
+                  `Вам поставил(а) лайк ${liker.name}`,
+                  liker.image || '/favicons/android-chrome-192x192.png'
+                );
+                
+                // Push уведомление
+                window.supabaseManager.sendPushNotification(
+                  '❤️ Новый лайк!',
+                  `Вам поставил(а) лайк ${liker.name}`,
+                  userId,
+                  liker.image || '/favicons/android-chrome-192x192.png'
+                );
+              }
+            };
+            
+            loadLikerInfo();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Real-time подписка на новые мэтчи
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const subscription = supabase
+      .channel('matches')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'chats'
+        }, 
+        (payload) => {
+          console.log('New match:', payload);
+          // Если мэтч создан с участием текущего пользователя
+          if (payload.new.participant_1_id === userId || payload.new.participant_2_id === userId) {
+            // Определяем ID собеседника
+            const partnerId = payload.new.participant_1_id === userId 
+              ? payload.new.participant_2_id 
+              : payload.new.participant_1_id;
+            
+            // Загружаем информацию о партнере
+            const loadPartnerInfo = async () => {
+              const { data: partner } = await supabase
+                .from('users')
+                .select('name, image')
+                .eq('id', partnerId)
+                .single();
+              
+              if (partner) {
+                // Локальное уведомление
+                window.supabaseManager.sendNotification(
+                  '🔥 Новый мэтч!',
+                  `У вас мэтч с ${partner.name}! Начните общение`,
+                  partner.image || '/favicons/android-chrome-192x192.png'
+                );
+                
+                // Push уведомление
+                window.supabaseManager.sendPushNotification(
+                  '🔥 Новый мэтч!',
+                  `У вас мэтч с ${partner.name}! Начните общение`,
+                  userId,
+                  partner.image || '/favicons/android-chrome-192x192.png'
+                );
+              }
+            };
+            
+            loadPartnerInfo();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Real-time подписка на сообщения
   useEffect(() => {
     const userId = localStorage.getItem('userId');
