@@ -907,9 +907,7 @@ const MainApp = () => {
             const imageUrl = await userService.uploadAvatar(userId, file);
             await supabase.from('users').update({ image: imageUrl }).eq('id', userId);
             setUserData({...userData, image: imageUrl});
-            if (!userImages.includes(imageUrl)) {
-                await updateGallery([imageUrl, ...userImages]);
-            }
+            // НЕ добавляем аватар в галерею автоматически
         } else if (isGallery && userId) {
             const file = e.target.files[0];
             const imageUrl = await userService.uploadGalleryImage(userId, file);
@@ -2126,12 +2124,12 @@ const MainApp = () => {
                    localStorage.removeItem('userId');
                    localStorage.removeItem('userImages');
                    localStorage.removeItem('supabase.auth.token');
-                   // Принудительно обновляем состояние через App компонент
-                   window.location.href = window.location.origin;
+                   // Полная перезагрузка страницы для сброса состояния
+                   window.location.reload(true);
                  } catch (error) {
                    console.error('Error signing out:', error);
                    // В случае ошибки все равно пробуем обновить
-                   window.location.href = window.location.origin;
+                   window.location.reload(true);
                  }
                }} className="w-full bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
                  <div className="flex items-center gap-4 text-red-500"><LogOut size={20}/><span className="font-bold uppercase tracking-tighter text-sm text-white">Выйти</span></div>
