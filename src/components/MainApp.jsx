@@ -2187,11 +2187,14 @@ const MainApp = () => {
                     max="100" 
                     value={userData.age || ''} 
                     onChange={e => {
-                      const age = parseInt(e.target.value);
-                      if (e.target.value === '') {
+                      const value = e.target.value;
+                      if (value === '') {
                         setUserData({...userData, age: null});
-                      } else if (age >= 18 && age <= 100) {
-                        setUserData({...userData, age});
+                      } else {
+                        const age = parseInt(value);
+                        if (!isNaN(age) && age >= 18 && age <= 100) {
+                          setUserData({...userData, age});
+                        }
                       }
                     }} 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500"
