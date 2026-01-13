@@ -508,6 +508,15 @@ const MainApp = () => {
                       }
                       
                       console.log('User data loaded:', !!user);
+                      if (user) {
+                          console.log('User profile data:', { 
+                              id: user.id, 
+                              name: user.name, 
+                              age: user.age, 
+                              hasImages: !!user.images,
+                              imagesCount: user.images?.length || 0 
+                          });
+                      }
                       clearTimeout(timeout);
                   
                   // Если профиля нет, создаем его с пустыми полями
@@ -523,6 +532,7 @@ const MainApp = () => {
                        has_bike: false,
                        about: null,
                        image: null,
+                       images: [], // Пустой массив для галереи
                        has_seen_welcome: false,
                        created_at: new Date().toISOString()
                      };
@@ -538,10 +548,16 @@ const MainApp = () => {
                   }
                     
                   if (user) {
+                    console.log('Setting userData and userImages...');
                     setUserData(user);
                     if (user.images && Array.isArray(user.images)) {
+                        console.log('Setting userImages:', user.images.length);
                         setUserImages(user.images);
                         localStorage.setItem('userImages', JSON.stringify(user.images));
+                    } else {
+                        console.log('No images array found, setting empty array');
+                        setUserImages([]);
+                        localStorage.setItem('userImages', JSON.stringify([]));
                     }
                     
                     // Повторно пытаемся подписаться на push уведомления после загрузки userData
@@ -2418,11 +2434,12 @@ const MainApp = () => {
                     value={userData.age || ''} 
                     onChange={e => {
                       const value = e.target.value;
+                      // Позволяем вводить любые числа, валидацию сделаем при сохранении
                       if (value === '') {
                         setUserData({...userData, age: null});
                       } else {
                         const age = parseInt(value);
-                        if (!isNaN(age) && age >= 18 && age <= 100) {
+                        if (!isNaN(age)) {
                           setUserData({...userData, age});
                         }
                       }
