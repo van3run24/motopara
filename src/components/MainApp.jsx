@@ -587,6 +587,7 @@ const MainApp = () => {
   const fileInputRef = useRef(null);
   const profileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const editGalleryInputRef = useRef(null); // Отдельный ref для редактирования анкеты
   const chatFileInputRef = useRef(null);
 
   // Данные пользователя
@@ -1000,13 +1001,8 @@ const MainApp = () => {
                     setUserData(prev => ({...prev}));
                 }, 100);
                 
-                // Добавляем аватар в галерею с задержкой
-                setTimeout(async () => {
-                    if (!userImages.includes(imageUrl)) {
-                        console.log('Adding avatar to gallery:', imageUrl);
-                        await updateGallery([imageUrl, ...userImages]);
-                    }
-                }, 500);
+                // Аватар НЕ добавляется в галерею автоматически
+                // Пользователь может добавить его в галерею отдельно через кнопку "Добавить фото"
             } catch (uploadError) {
                 console.error('Avatar upload error:', uploadError);
                 throw uploadError;
@@ -2360,9 +2356,9 @@ const MainApp = () => {
                                   const newImages = userImages.filter((_, i) => i !== idx);
                                   setUserImages(newImages);
                                   await updateGallery(newImages);
-                                  // Если удаляем главное фото, убираем его из userData
+                                  // Если удаляем главное фото, убираем его из userData, но НЕ заменяем автоматически
                                   if (isMainPhoto) {
-                                    setUserData({...userData, image: newImages[0] || null});
+                                    setUserData({...userData, image: null});
                                   }
                                 }
                               }}
@@ -2375,7 +2371,7 @@ const MainApp = () => {
                       })}
                     </div>
                     <button
-                      onClick={() => galleryInputRef.current?.click()}
+                      onClick={() => editGalleryInputRef.current?.click()}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
                       <Plus size={16} />
@@ -2383,6 +2379,15 @@ const MainApp = () => {
                     </button>
                   </div>
                 )}
+
+                {/* Скрытый input для галереи в редактировании анкеты */}
+                <input 
+                  type="file" 
+                  ref={editGalleryInputRef}
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e, false, true)}
+                  className="hidden"
+                />
 
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Имя</label><input type="text" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
                 <div className="space-y-2">
