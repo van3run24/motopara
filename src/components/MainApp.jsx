@@ -287,7 +287,7 @@ const MainApp = () => {
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [hasNewMatchNotification, setHasNewMatchNotification] = useState(false);
+  const [matchNotificationVisible, setMatchNotificationVisible] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -534,7 +534,7 @@ const MainApp = () => {
           setChats(prev => [...prev, chatData]);
           
           setMatchData(likedUser);
-          setHasNewMatchNotification(true);
+          setMatchNotificationVisible(true);
           setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
         }
       }
@@ -2475,7 +2475,7 @@ const MainApp = () => {
                 setActiveTab('chats'); 
                 setSelectedChat(null); 
                 setMatchData(null); 
-                setHasNewMatchNotification(false); 
+                setMatchNotificationVisible(false); 
                 setSwipedChatId(null); 
                 setShowSettings(false); 
                 setShowAppSettings(false); 
@@ -2483,7 +2483,7 @@ const MainApp = () => {
               }} className={`flex flex-col items-center gap-1 relative transition-colors active:scale-95 ${activeTab === 'chats' ? 'text-orange-500' : 'text-zinc-600'}`}>
               <MessageCircle size={22}/>
               <span className="text-[9px] font-black uppercase">Чаты</span>
-              {hasNewMatchNotification && <div className="absolute top-0 right-1 w-2 h-2 bg-orange-600 rounded-full border-2 border-[#1c1c1e]" />}
+              {matchNotificationVisible && <div className="absolute top-0 right-1 w-2 h-2 bg-orange-600 rounded-full border-2 border-[#1c1c1e]" />}
           </button>
           <button onClick={() => {
                 setActiveTab('profile'); 
