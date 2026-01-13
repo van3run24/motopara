@@ -429,6 +429,7 @@ const MainApp = () => {
   };
 
   const [selectedImage, setSelectedImage] = useState(null); // Для модального окна просмотра всех фото (чат, галерея, профиль)
+  const [imageContext, setImageContext] = useState({ type: null, images: [], currentIndex: 0 }); // Контекст просмотра фото
   const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   useEffect(() => {
@@ -949,19 +950,20 @@ const MainApp = () => {
 
   // Функции для навигации по фото в модальном окне
   const navigateImage = (direction) => {
-    if (!selectedImage || !userImages.length) return;
+    if (!selectedImage || !imageContext.images.length) return;
     
-    const currentIndex = userImages.indexOf(selectedImage);
+    const currentIndex = imageContext.images.indexOf(selectedImage);
     if (currentIndex === -1) return;
     
     let newIndex;
     if (direction === 'next') {
-      newIndex = currentIndex < userImages.length - 1 ? currentIndex + 1 : 0;
+      newIndex = currentIndex < imageContext.images.length - 1 ? currentIndex + 1 : 0;
     } else {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : userImages.length - 1;
+      newIndex = currentIndex > 0 ? currentIndex - 1 : imageContext.images.length - 1;
     }
     
-    setSelectedImage(userImages[newIndex]);
+    setSelectedImage(imageContext.images[newIndex]);
+    setImageContext(prev => ({ ...prev, currentIndex: newIndex }));
   };
 
   // Обработчик клавиатуры для модального окна
@@ -980,7 +982,7 @@ const MainApp = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, userImages]);
+  }, [selectedImage, imageContext]);
 
   const openChat = async (chat) => {
     setSelectedChat(chat);
@@ -2117,7 +2119,13 @@ const MainApp = () => {
                             <img 
                               src={msg.image} 
                               alt="Sent" 
-                              onClick={() => setSelectedImage(msg.image)}
+                              onClick={() => {
+                                setSelectedImage(msg.image);
+                                // Получаем все фото из этого чата
+                                const chatImages = selectedChat?.messages?.filter(m => m.type === 'image').map(m => m.image) || [];
+                                const currentIndex = chatImages.indexOf(msg.image);
+                                setImageContext({ type: 'chat', images: chatImages, currentIndex });
+                              }}
                               className={`rounded-2xl ${msg.sender === 'me' ? 'rounded-br-none' : 'rounded-bl-none'} max-w-[200px] h-auto cursor-pointer active:opacity-80 transition-opacity`}
                             />
                             <div className={`absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md flex items-center gap-1`}>
@@ -2312,7 +2320,10 @@ const MainApp = () => {
                   {userImages.map((img, idx) => {
                     const isMainPhoto = userData?.image === img;
                     return (
-                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group cursor-pointer" onClick={() => setSelectedImage(img)}>
+                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group cursor-pointer" onClick={() => {
+                    setSelectedImage(img);
+                    setImageContext({ type: 'gallery', images: userImages, currentIndex: idx });
+                  }}>
                         <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
                         {isMainPhoto && (
                           <div className="absolute top-1 left-1 px-2 py-0.5 bg-orange-600 text-[8px] font-black uppercase rounded">Главное</div>
@@ -3028,7 +3039,7 @@ const MainApp = () => {
         <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center">
             {/* Кнопка предыдущего фото */}
-            {userImages.length > 1 && (
+            {imageContext.images.length > 1 && (
               <button 
                 onClick={() => navigateImage('prev')}
                 className="absolute left-4 p-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all"
@@ -3044,7 +3055,7 @@ const MainApp = () => {
             />
             
             {/* Кнопка следующего фото */}
-            {userImages.length > 1 && (
+            {imageContext.images.length > 1 && (
               <button 
                 onClick={() => navigateImage('next')}
                 className="absolute right-4 p-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all"
@@ -3062,13 +3073,13 @@ const MainApp = () => {
             </button>
             
             {/* Индикатор текущего фото */}
-            {userImages.length > 1 && (
+            {imageContext.images.length > 1 && (
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-                {userImages.map((_, index) => (
+                {imageContext.images.map((_, index) => (
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full transition-all ${
-                      userImages[index] === selectedImage 
+                      index === imageContext.currentIndex 
                         ? 'bg-orange-500 w-6' 
                         : 'bg-white/50'
                     }`}
@@ -3079,7 +3090,7 @@ const MainApp = () => {
             
             {/* Информация о фото */}
             <div className="absolute bottom-4 left-4 text-white/70 text-sm">
-              {userImages.indexOf(selectedImage) + 1} / {userImages.length}
+              {imageContext.images.length > 0 ? `${imageContext.currentIndex + 1} / ${imageContext.images.length}` : ''}
             </div>
           </div>
         </div>

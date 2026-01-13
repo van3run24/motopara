@@ -179,7 +179,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             image: partner?.image || null,
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
-            lastMessage: messages?.length > 0 ? messages[messages.length - 1]?.text || 'Начните общение' : 'Начните общение',
+            lastMessage: messages?.length > 0 ? 
+              (messages[messages.length - 1]?.type === 'image' ? 'Фотография' : messages[messages.length - 1]?.text) || 'Начните общение' : 'Начните общение',
             time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? (() => {
               const messageDate = new Date(messages[messages.length - 1].created_at);
               const now = new Date();
