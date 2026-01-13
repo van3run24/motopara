@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
@@ -204,7 +204,7 @@ const MainApp = () => {
     if (events.length > 0) {
       geocodeEvents();
     }
-  }, [events.length]); // Запускаем при изменении количества событий
+  }, [events.filter(e => !e.coordinates && e.address).length]); // Запускаем при изменении количества событий без координат
 
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
@@ -2314,7 +2314,7 @@ const MainApp = () => {
                 </div>
                 <div className="relative">
                   <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-                    <MapPinIcon size={18} className="text-zinc-400 flex-shrink-0" />
+                    <MapPin size={18} className="text-zinc-400 flex-shrink-0" />
                     <input 
                       type="text" 
                       value={newEvent.address}
