@@ -497,6 +497,7 @@ const MainApp = () => {
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
   const [contextMenuMessageId, setContextMenuMessageId] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -900,6 +901,7 @@ const MainApp = () => {
     if (!e.target.files || e.target.files.length === 0) return;
 
     try {
+        setIsUploading(true); // Начинаем загрузку
         const userId = localStorage.getItem('userId');
         
         if (isProfile && userId) {
@@ -907,11 +909,15 @@ const MainApp = () => {
             const imageUrl = await userService.uploadAvatar(userId, file);
             await supabase.from('users').update({ image: imageUrl }).eq('id', userId);
             setUserData({...userData, image: imageUrl});
-            // НЕ добавляем аватар в галерею автоматически
+            // Добавляем аватар также в галерею
+            if (!userImages.includes(imageUrl)) {
+                await updateGallery([imageUrl, ...userImages]);
+            }
         } else if (isGallery && userId) {
             const file = e.target.files[0];
             const imageUrl = await userService.uploadGalleryImage(userId, file);
             await updateGallery([...userImages, imageUrl]);
+            // НЕ меняем аватар при добавлении в галерею
         } else {
             // Chat images (support multiple)
             const files = Array.from(e.target.files);
@@ -937,6 +943,8 @@ const MainApp = () => {
     } catch (err) {
         console.error('Error uploading image:', err);
         setError('Ошибка загрузки фото');
+    } finally {
+        setIsUploading(false); // Завершаем загрузку в любом случае
     }
   };
 
@@ -2091,9 +2099,14 @@ const MainApp = () => {
                   ))}
                   <button
                     onClick={() => galleryInputRef.current?.click()}
-                    className="aspect-square rounded-2xl border-2 border-dashed border-white/20 flex items-center justify-center hover:border-white/40 transition-colors active:scale-95"
+                    disabled={isUploading}
+                    className="aspect-square rounded-2xl border-2 border-dashed border-white/20 flex items-center justify-center hover:border-white/40 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Plus size={20} className="text-zinc-600" />
+                    {isUploading ? (
+                      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Plus size={20} className="text-zinc-600" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -2120,16 +2133,21 @@ const MainApp = () => {
 
               <button onClick={async () => {
                  try {
+                   setIsUploading(true); // Показываем загрузку
                    await supabase.auth.signOut();
                    localStorage.removeItem('userId');
                    localStorage.removeItem('userImages');
                    localStorage.removeItem('supabase.auth.token');
-                   // Полная перезагрузка страницы для сброса состояния
-                   window.location.reload(true);
+                   localStorage.removeItem('supabase.auth.refreshToken');
+                   // Полная очистка и перезагрузка
+                   setTimeout(() => {
+                     window.location.href = window.location.origin + '?logout=' + Date.now();
+                   }, 100);
                  } catch (error) {
                    console.error('Error signing out:', error);
+                   setIsUploading(false);
                    // В случае ошибки все равно пробуем обновить
-                   window.location.reload(true);
+                   window.location.href = window.location.origin + '?logout=' + Date.now();
                  }
                }} className="w-full bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
                  <div className="flex items-center gap-4 text-red-500"><LogOut size={20}/><span className="font-bold uppercase tracking-tighter text-sm text-white">Выйти</span></div>
@@ -2171,9 +2189,17 @@ const MainApp = () => {
                     </div>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase active:scale-95 transition-all"
+                      disabled={isUploading}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Загрузить фото
+                      {isUploading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Загрузка...
+                        </>
+                      ) : (
+                        'Загрузить фото'
+                      )}
                     </button>
                   </div>
                 </div>
