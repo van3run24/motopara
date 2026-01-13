@@ -613,7 +613,6 @@ const MainApp = () => {
   const fileInputRef = useRef(null);
   const profileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
-  const editGalleryInputRef = useRef(null); // Отдельный ref для редактирования анкеты
   const chatFileInputRef = useRef(null);
 
   // Данные пользователя
@@ -1027,8 +1026,13 @@ const MainApp = () => {
                     setUserData(prev => ({...prev}));
                 }, 100);
                 
-                // Аватар НЕ добавляется в галерею автоматически
-                // Пользователь может добавить его в галерею отдельно через кнопку "Добавить фото"
+                // Добавляем аватар в галерею с задержкой
+                setTimeout(async () => {
+                    if (!userImages.includes(imageUrl)) {
+                        console.log('Adding avatar to gallery:', imageUrl);
+                        await updateGallery([imageUrl, ...userImages]);
+                    }
+                }, 500);
             } catch (uploadError) {
                 console.error('Avatar upload error:', uploadError);
                 throw uploadError;
@@ -2246,11 +2250,33 @@ const MainApp = () => {
               <div className="w-full max-w-md mb-6">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 mb-4 ml-1">Галерея</h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {userImages.map((img, idx) => (
-                    <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group">
-                      <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
-                    </div>
-                  ))}
+                  {userImages.map((img, idx) => {
+                    const isMainPhoto = userData?.image === img;
+                    return (
+                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group">
+                        <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
+                        {isMainPhoto && (
+                          <div className="absolute top-1 left-1 px-2 py-0.5 bg-orange-600 text-[8px] font-black uppercase rounded">Главное</div>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (window.confirm('Вы точно хотите удалить фотографию?')) {
+                              const newImages = userImages.filter((_, i) => i !== idx);
+                              setUserImages(newImages);
+                              await updateGallery(newImages);
+                              // Если удаляем главное фото, убираем его из userData, но НЕ заменяем автоматически
+                              if (isMainPhoto) {
+                                setUserData({...userData, image: null});
+                              }
+                            }
+                          }}
+                          className="absolute top-1 right-1 bg-red-600/90 hover:bg-red-600 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
+                        >
+                          <X size={12} className="text-white" />
+                        </button>
+                      </div>
+                    );
+                  })}
                   <button
                     onClick={() => galleryInputRef.current?.click()}
                     disabled={isUploading}
@@ -2381,58 +2407,6 @@ const MainApp = () => {
                     </button>
                   </div>
                 </div>
-                
-                {/* ГАЛЕРЕЯ ФОТО */}
-                {(userImages.length > 0 || userData?.image) && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-600 uppercase">Галерея фото</label>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      {userImages.map((img, idx) => {
-                        const isMainPhoto = userData?.image === img;
-                        return (
-                          <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-white/10 relative group">
-                            <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
-                            {isMainPhoto && (
-                              <div className="absolute top-1 left-1 px-2 py-0.5 bg-orange-600 text-[8px] font-black uppercase rounded">Главное</div>
-                            )}
-                            <button
-                              onClick={async () => {
-                                if (window.confirm('Вы точно хотите удалить фотографию?')) {
-                                  const newImages = userImages.filter((_, i) => i !== idx);
-                                  setUserImages(newImages);
-                                  await updateGallery(newImages);
-                                  // Если удаляем главное фото, убираем его из userData, но НЕ заменяем автоматически
-                                  if (isMainPhoto) {
-                                    setUserData({...userData, image: null});
-                                  }
-                                }
-                              }}
-                              className="absolute top-1 right-1 bg-red-600/90 hover:bg-red-600 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity active:scale-90"
-                            >
-                              <X size={12} className="text-white" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button
-                      onClick={() => editGalleryInputRef.current?.click()}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold uppercase flex items-center justify-center gap-2 active:scale-95 transition-all"
-                    >
-                      <Plus size={16} />
-                      Добавить фото
-                    </button>
-                  </div>
-                )}
-
-                {/* Скрытый input для галереи в редактировании анкеты */}
-                <input 
-                  type="file" 
-                  ref={editGalleryInputRef}
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(e, false, true)}
-                  className="hidden"
-                />
 
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Имя</label><input type="text" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
                 <div className="space-y-2">
