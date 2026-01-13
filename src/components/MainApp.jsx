@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
@@ -12,19 +12,39 @@ import L from 'leaflet';
 delete L.Icon.Default.prototype._getIconUrl;
 
 // Создаем кастомные иконки
-const createCustomIcon = (color) => {
+const createCustomIcon = (color, isUser = false) => {
+  const iconEmoji = isUser ? '🏍️' : (color === '#ec4899' ? '👩‍🦰' : '👨‍🦰');
+  
   return L.divIcon({
-    html: `<div style="background-color: ${color}; width: 25px; height: 41px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    html: `
+      <div style="
+        background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%);
+        width: ${isUser ? '40px' : '32px'};
+        height: ${isUser ? '40px' : '32px'};
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: ${isUser ? '20px' : '14px'};
+        transform: translateY(-50%);
+        position: relative;
+        z-index: 1000;
+      ">
+        ${iconEmoji}
+      </div>
+    `,
     className: 'custom-marker',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+    iconSize: [isUser ? 40 : 32, isUser ? 40 : 32],
+    iconAnchor: [isUser ? 20 : 16, isUser ? 40 : 32],
+    popupAnchor: [0, -30],
+    shadowSize: [0, 0]
   });
 };
 
 // Иконки для разных типов
-const userIcon = createCustomIcon('#ea580c'); // Оранжевый для текущего пользователя
+const userIcon = createCustomIcon('#ea580c', true); // Оранжевый для текущего пользователя
 const maleIcon = createCustomIcon('#3b82f6'); // Голубой для мужчин
 const femaleIcon = createCustomIcon('#ec4899'); // Розовый для женщин
 
@@ -39,6 +59,26 @@ const MainApp = () => {
   const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+  // Функция форматирования даты и времени
+  const formatMessageTime = (createdAt) => {
+    if (!createdAt) return '';
+    
+    const messageDate = new Date(createdAt);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    
+    const time = messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    
+    if (messageDay.getTime() === today.getTime()) {
+      return time; // Сегодня - только время
+    } else if (messageDay.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
+      return `Вчера, ${time}`; // Вчера
+    } else {
+      return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + `, ${time}`;
+    }
+  };
 
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
@@ -169,20 +209,23 @@ const MainApp = () => {
   const profileScrollRef = useRef(null); // Ref for resetting scroll
 
   // Фильтруем анкеты: используем данные из Supabase
-  const matchedIds = chats.map(chat => {
+  const matchedIds = useMemo(() => chats.map(chat => {
       // Ищем ID собеседника (не свой ID)
       const currentUserId = localStorage.getItem('userId');
       if (chat.participant_1_id == currentUserId) return chat.participant_2_id;
       if (chat.participant_2_id == currentUserId) return chat.participant_1_id;
       return null;
-    }).filter(Boolean);
-  
-  const filteredBikers = userData ? bikers.filter(b => 
-    b.city === userData.city && 
-    b.gender !== userData.gender && 
-    !matchedIds.includes(b.id)
-  ) : [];
-  
+  }).filter(id => id), [chats]);
+
+  const filteredBikers = useMemo(() => {
+    const currentUserId = localStorage.getItem('userId');
+    return bikers.filter(b => 
+      !matchedIds.includes(b.id) && 
+      b.id !== currentUserId &&
+      b.city === userData?.city
+    );
+  }, [bikers, matchedIds, userData?.city]);
+
   // Безопасное получение currentBiker с проверкой на существование
   const currentBiker = filteredBikers.length > 0 && currentIndex >= 0 && currentIndex < filteredBikers.length 
     ? filteredBikers[currentIndex] 
@@ -1409,7 +1452,7 @@ const MainApp = () => {
                             />
                             <div className={`absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md flex items-center gap-1`}>
                                 <span className="text-[9px] text-white/90 font-medium">
-                                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                    {formatMessageTime(msg.created_at)}
                                 </span>
                                 {msg.sender === 'me' && (
                                      msg.is_read ? <CheckCheck size={10} className="text-white/90" /> : <Check size={10} className="text-white/90" />
@@ -1423,7 +1466,7 @@ const MainApp = () => {
                             {msg.is_edited && <span className="text-[9px] opacity-60 self-center">(ред.)</span>}
                             <div className={`flex items-center gap-1 select-none ml-auto h-4 ${msg.sender === 'me' ? 'text-white/70' : 'text-zinc-500'}`}>
                                <span className="text-[9px] font-medium">
-                                  {msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                  {formatMessageTime(msg.created_at)}
                                </span>
                                {msg.sender === 'me' && (
                                   msg.is_read ? <CheckCheck size={12} /> : <Check size={12} />
@@ -1548,7 +1591,12 @@ const MainApp = () => {
               >
                 <div className="w-full h-full rounded-[42px] bg-zinc-900 flex items-center justify-center overflow-hidden border-4 border-black">
                   {userData?.image ? (
-                    <img src={userData.image} className="w-full h-full object-cover" alt="Profile" />
+                    <img 
+                      src={userData.image} 
+                      className="w-full h-full object-cover" 
+                      alt="Profile" 
+                      loading="lazy"
+                    />
                   ) : (
                     <User size={60} className="text-zinc-800" />
                   )}

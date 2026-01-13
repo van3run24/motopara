@@ -194,7 +194,14 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         })
       );
       
-      onChatsLoaded(chatsWithMessages);
+      // Сортируем чаты по времени последнего сообщения (новые сверху)
+      const sortedChats = chatsWithMessages.sort((a, b) => {
+        const timeA = a.time ? new Date(`1970-01-01 ${a.time}`) : new Date(0);
+        const timeB = b.time ? new Date(`1970-01-01 ${b.time}`) : new Date(0);
+        return timeB - timeA;
+      });
+      
+      onChatsLoaded(sortedChats);
       
     } catch (err) {
       console.error('Error loading chats:', err);
