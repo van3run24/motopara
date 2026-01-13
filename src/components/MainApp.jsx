@@ -573,6 +573,18 @@ const MainApp = () => {
     return [];
   });
 
+  // Set up global callbacks for real-time updates
+  useEffect(() => {
+    window.newMatchesCallback = (matches) => {
+      setNewMatches(prev => [...matches, ...prev]);
+      setHasNewMatchNotification(true);
+    };
+    
+    return () => {
+      window.newMatchesCallback = null;
+    };
+  }, []);
+
   // Sync selectedChat with chats for real-time updates
   useEffect(() => {
     if (selectedChat) {
@@ -674,7 +686,8 @@ const MainApp = () => {
           
           setMatchData(likedUser);
           setHasNewMatchNotification(true);
-          setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
+          // Добавляем chatId для правильной идентификации
+          setNewMatches(prev => [{...likedUser, chatId: newChat.id, isNew: true}, ...prev]);
           
           // Отправляем уведомление о новом мэтче
           sendNotification('🏍️ Новый мэтч!', {
@@ -828,7 +841,7 @@ const MainApp = () => {
     const updatedChats = chats.map(c => c.id === chat.id ? {...c, unreadCount: 0, isNew: false} : c);
     setChats(updatedChats);
     // Убираем из новых мэтчей
-    setNewMatches(prev => prev.map(m => m.id === chat.id || m.name === chat.name ? {...m, isNew: false} : m));
+    setNewMatches(prev => prev.map(m => m.chatId === chat.id ? {...m, isNew: false} : m));
     
     // Mark as read in backend
     if (window.supabaseManager?.markAsRead) {
@@ -1667,26 +1680,50 @@ const MainApp = () => {
                     <button
                       key={match.id}
                       onClick={() => {
-                        const existingChat = chats.find(c => c.name === match.name);
+                        const existingChat = chats.find(c => c.id === match.chatId);
                         if (existingChat) {
                           openChat(existingChat);
                         } else {
-                          const newChat = { 
-                            id: Date.now(), 
-                            name: match.name, 
-                            image: match.image || match.images?.[0], 
-                            lastMessage: "Вы пара!", 
-                            messages: [], 
-                            online: true, 
-                            time: "только что", 
-                            unreadCount: 0,
-                            isNew: true
+                          // Если чата еще нет в стейте, загружаем его
+                          const loadChat = async () => {
+                            try {
+                              const { data: chatData } = await supabase
+                                .from('chats')
+                                .select(`
+                                  *,
+                                  participant_1:participant_1_id(name, image),
+                                  participant_2:participant_2_id(name, image)
+                                `)
+                                .eq('id', match.chatId)
+                                .single();
+                              
+                              if (chatData) {
+                                const partner = chatData.participant_1_id === localStorage.getItem('userId') 
+                                  ? chatData.participant_2 
+                                  : chatData.participant_1;
+                                
+                                const newChat = {
+                                  id: chatData.id,
+                                  name: partner.name,
+                                  image: partner.image || match.image || match.images?.[0],
+                                  lastMessage: "Вы пара!",
+                                  messages: [],
+                                  online: true,
+                                  time: "только что",
+                                  unreadCount: 0,
+                                  partnerId: partner.id
+                                };
+                                setChats([newChat, ...chats]);
+                                openChat(newChat);
+                              }
+                            } catch (error) {
+                              console.error('Error loading chat:', error);
+                            }
                           };
-                          setChats([newChat, ...chats]);
-                          // Убираем из новых мэтчей, но оставляем в сообщениях
-                          setNewMatches(prev => prev.map(m => m.id === match.id || m.name === match.name ? {...m, isNew: false} : m));
-                          openChat(newChat);
+                          loadChat();
                         }
+                        // Убираем из новых мэтчей
+                        setNewMatches(prev => prev.map(m => m.chatId === match.chatId ? {...m, isNew: false} : m));
                       }}
                       className="flex-shrink-0 flex flex-col items-center gap-2 active:scale-95 transition-transform"
                     >
@@ -1704,7 +1741,7 @@ const MainApp = () => {
             {chats.length > 0 ? (
             <div className="space-y-3">
                 {chats.map(chat => {
-                  const isNewMatch = newMatches.some(m => (m.id === chat.id || m.name === chat.name) && m.isNew);
+                  const isNewMatch = newMatches.some(m => m.chatId === chat.id && m.isNew);
                   
                   const handleTouchStart = (e) => {
                     const touch = e.targetTouches[0];

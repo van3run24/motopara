@@ -485,9 +485,51 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           schema: 'public', 
           table: 'chats'
         }, 
-        (payload) => {
+        async (payload) => {
           console.log('New chat:', payload);
           if (payload.new.participant_1_id === userId || payload.new.participant_2_id === userId) {
+            // Определяем ID партнера
+            const partnerId = payload.new.participant_1_id === userId ? 
+              payload.new.participant_2_id : payload.new.participant_1_id;
+            
+            // Загружаем данные партнера для нового мэтча
+            try {
+              const { data: partner } = await supabase
+                .from('users')
+                .select('name, image, images')
+                .eq('id', partnerId)
+                .single();
+                
+              if (partner) {
+                // Добавляем в новые мэтчи через глобальный менеджер
+                if (window.newMatchesCallback) {
+                  window.newMatchesCallback([{
+                    ...partner,
+                    chatId: payload.new.id,
+                    isNew: true
+                  }]);
+                }
+                
+                // Отправляем уведомление о новом мэтче
+                if (window.supabaseManager) {
+                  window.supabaseManager.sendNotification(
+                    '🏍️ Новый мэтч!',
+                    `У вас мэтч с ${partner.name}! Начните общение`,
+                    partner.image || '/favicons/android-chrome-192x192.png'
+                  );
+                  
+                  window.supabaseManager.sendPushNotification(
+                    '🏍️ Новый мэтч!',
+                    `У вас мэтч с ${partner.name}! Начните общение`,
+                    userId,
+                    partner.image || '/favicons/android-chrome-192x192.png'
+                  );
+                }
+              }
+            } catch (error) {
+              console.error('Error loading partner data for new match:', error);
+            }
+            
             loadChats();
             loadUsers();
           }
