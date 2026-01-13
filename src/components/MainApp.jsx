@@ -176,6 +176,8 @@ const MainApp = () => {
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
           }
+          // Подписываемся на push уведомления
+          await subscribeToPushNotifications();
         }
       } catch (error) {
         console.error('Ошибка запроса разрешения на уведомления:', error);
@@ -204,6 +206,49 @@ const MainApp = () => {
       return notification;
     }
     return null;
+  };
+
+  // Подписка на push уведомления
+  const subscribeToPushNotifications = async () => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array('BLc1xPvF8jHq3xL8f9k2mN4p7r6sT5uV8wX2yZ1aQ3bC4dE5fG6hI7jK8lM9nO0p')
+        });
+
+        // Сохраняем подписку в базу данных
+        const { error } = await supabase
+          .from('push_subscriptions')
+          .upsert({
+            user_id: userData?.id,
+            endpoint: subscription.endpoint,
+            p256dh_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh')))),
+            auth_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))))
+          });
+
+        if (error) {
+          console.error('Ошибка сохранения подписки:', error);
+        } else {
+          console.log('Подписка на push уведомления успешно сохранена');
+        }
+      } catch (error) {
+        console.error('Ошибка подписки на push уведомления:', error);
+      }
+    }
+  };
+
+  // Вспомогательная функция для конвертации VAPID ключа
+  const urlB64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
   };
   const formatMessageTime = (createdAt) => {
     if (!createdAt) return '';
