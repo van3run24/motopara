@@ -91,6 +91,7 @@ function App() {
         } else {
           setIsLoggedIn(false);
           localStorage.removeItem('userId');
+          localStorage.removeItem('supabase.auth.token');
           // НЕ открываем модалку автоматически для веб-версии
           if (isPWA) {
             setIsAuthModalOpen(true);

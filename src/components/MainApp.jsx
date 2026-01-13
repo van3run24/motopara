@@ -2121,10 +2121,18 @@ const MainApp = () => {
               </button>
 
               <button onClick={async () => {
-                 await supabase.auth.signOut();
-                 localStorage.removeItem('userId');
-                 localStorage.removeItem('userImages');
-                 window.location.reload();
+                 try {
+                   await supabase.auth.signOut();
+                   localStorage.removeItem('userId');
+                   localStorage.removeItem('userImages');
+                   localStorage.removeItem('supabase.auth.token');
+                   // Принудительно обновляем состояние через App компонент
+                   window.location.href = window.location.origin;
+                 } catch (error) {
+                   console.error('Error signing out:', error);
+                   // В случае ошибки все равно пробуем обновить
+                   window.location.href = window.location.origin;
+                 }
                }} className="w-full bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
                  <div className="flex items-center gap-4 text-red-500"><LogOut size={20}/><span className="font-bold uppercase tracking-tighter text-sm text-white">Выйти</span></div>
               </button>
