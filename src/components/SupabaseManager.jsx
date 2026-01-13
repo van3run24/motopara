@@ -180,9 +180,21 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
             lastMessage: messages?.length > 0 ? messages[messages.length - 1]?.text || 'Начните общение' : 'Начните общение',
-            time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? 
-              new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
-              '',
+            time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? (() => {
+              const messageDate = new Date(messages[messages.length - 1].created_at);
+              const now = new Date();
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+              const time = messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+              
+              if (messageDay.getTime() === today.getTime()) {
+                return time; // Сегодня - только время
+              } else if (messageDay.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
+                return `Вчера`; // Вчера - только дата
+              } else {
+                return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); // Другие даты
+              }
+            })() : '',
             unreadCount: messages?.filter(m => {
               const isUnread = m.sender_id !== userId && !m.is_read;
               if (isUnread) {

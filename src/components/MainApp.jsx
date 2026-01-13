@@ -49,24 +49,14 @@ const MainApp = () => {
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-  // Функция форматирования даты и времени
+  // Функция форматирования времени
   const formatMessageTime = (createdAt) => {
     if (!createdAt) return '';
     
     const messageDate = new Date(createdAt);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
-    
     const time = messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     
-    if (messageDay.getTime() === today.getTime()) {
-      return time; // Сегодня - только время
-    } else if (messageDay.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
-      return `Вчера, ${time}`; // Вчера
-    } else {
-      return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + `, ${time}`;
-    }
+    return time;
   };
 
   // Функция форматирования даты для разделителя
@@ -1342,9 +1332,16 @@ const MainApp = () => {
                       {event.address && (
                         <button 
                           onClick={() => {
-                            const userLocation = `${userLocation?.lat || 55.7558},${userLocation?.lng || 37.6173}`;
-                            const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(userLocation)}~${encodeURIComponent(event.address)}&rtt=auto`;
-                            window.open(yandexMapsUrl, '_blank');
+                            // Используем Яндекс Навигатор для построения маршрута
+                            const yandexNavigatorUrl = `https://yandex.ru/navi/?route=${encodeURIComponent(event.address)}`;
+                            // Fallback на Яндекс Карты, если Навигатор не установлен
+                            const yandexMapsUrl = `https://yandex.ru/maps/?whatshere[point]=${encodeURIComponent(event.address)}&whatshere[zoom]=17`;
+                            
+                            // Сначала пробуем открыть Навигатор, потом Карты
+                            window.open(yandexNavigatorUrl, '_blank');
+                            setTimeout(() => {
+                              window.open(yandexMapsUrl, '_blank');
+                            }, 100);
                           }}
                           className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
