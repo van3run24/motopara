@@ -185,6 +185,31 @@ const MainApp = () => {
     }
   };
 
+  // Отправка push уведомления через API
+  const sendPushNotification = async (title, options = {}) => {
+    try {
+      const response = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          body: options.body || 'Новое уведомление',
+          icon: options.icon || '/favicons/android-chrome-192x192.png',
+          tag: options.tag || 'motopara-notification'
+        })
+      })
+      
+      const result = await response.json()
+      console.log('Push notification result:', result)
+      return result
+    } catch (error) {
+      console.error('Error sending push notification:', error)
+      return { success: false, error: error.message }
+    }
+  };
+
   // Отправка push уведомления
   const sendNotification = (title, options = {}) => {
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -651,6 +676,13 @@ const MainApp = () => {
           
           // Отправляем уведомление о новом мэтче
           sendNotification('🏍️ Новый мэтч!', {
+            body: `У вас новый мэтч: ${likedUser.name}, ${likedUser.age} лет`,
+            icon: likedUser.images?.[0] || DEFAULT_AVATAR,
+            tag: 'new-match'
+          });
+          
+          // Отправляем push уведомление
+          sendPushNotification('🏍️ Новый мэтч!', {
             body: `У вас новый мэтч: ${likedUser.name}, ${likedUser.age} лет`,
             icon: likedUser.images?.[0] || DEFAULT_AVATAR,
             tag: 'new-match'
