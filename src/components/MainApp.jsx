@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
@@ -7,6 +7,121 @@ import { cities } from '../data/cities';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
+
+// Компонент для автоподстановки адресов
+const AddressAutocomplete = ({ value, onChange, placeholder }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+
+  const fetchSuggestions = async (query) => {
+    if (!query || query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Попытка использовать API Яндекс.Карт если доступен ключ
+      if (process.env.REACT_APP_YANDEX_API_KEY) {
+        const response = await fetch(
+          `https://suggest-maps.yandex.ru/v1/suggest?apikey=${process.env.REACT_APP_YANDEX_API_KEY}&text=${encodeURIComponent(query)}&type=geo&results=5`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const addresses = data.results?.map(item => item.text) || [];
+          setSuggestions(addresses);
+          return;
+        }
+      }
+      
+      // Fallback: генерируем простые подсказки на основе города пользователя
+      const commonStreetTypes = ['улица', 'проспект', 'площадь', 'шоссе', 'бульвар', 'переулок', 'проезд', 'набережная'];
+      const commonPlaces = ['Центр', 'Парк', 'Сквер', 'Площадь', 'Вокзал', 'Аэропорт', 'Стадион'];
+      
+      const fallbackSuggestions = [];
+      
+      // Добавляем варианты с типами улиц
+      commonStreetTypes.slice(0, 3).forEach(type => {
+        fallbackSuggestions.push(`${query} ${type}`);
+      });
+      
+      // Добавляем популярные места
+      commonPlaces.slice(0, 2).forEach(place => {
+        fallbackSuggestions.push(`${place} "${query}"`);
+      });
+      
+      // Добавляем базовые варианты
+      fallbackSuggestions.push(`${query}`, `${query} центр`, `кафе ${query}`, `ресторан ${query}`);
+      
+      setSuggestions(fallbackSuggestions.slice(0, 5));
+      
+    } catch (error) {
+      console.error('Error fetching address suggestions:', error);
+      // Минимальный fallback
+      setSuggestions([`${query} улица`, `${query} проспект`, `${query} площадь`]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    fetchSuggestions(newValue);
+    setShowSuggestions(true);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    onChange(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  const handleClickOutside = (e) => {
+    if (inputRef.current && !inputRef.current.contains(e.target)) {
+      setShowSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={inputRef}>
+      <input
+        type="text"
+        value={value}
+        onChange={handleInputChange}
+        className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
+        placeholder={placeholder}
+        onFocus={() => setShowSuggestions(true)}
+      />
+      
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-white/10 rounded-xl shadow-lg max-h-48 overflow-y-auto z-50">
+          {loading ? (
+            <div className="p-3 text-zinc-500 text-sm">Загрузка...</div>
+          ) : (
+            suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
+              >
+                {suggestion}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Fix Leaflet icons - Custom Theme
 delete L.Icon.Default.prototype._getIconUrl;
@@ -46,6 +161,8 @@ L.Icon.Default.mergeOptions({
 const MainApp = () => {
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
   const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -205,6 +322,12 @@ const MainApp = () => {
                     if (user.images && Array.isArray(user.images)) {
                         setUserImages(user.images);
                         localStorage.setItem('userImages', JSON.stringify(user.images));
+                    }
+                    
+                    // Проверяем, новый ли это пользователь (пустой профиль)
+                    if (!user.name || !user.age || !user.bio || !user.images || user.images.length === 0) {
+                      setIsNewUser(true);
+                      setShowWelcomeModal(true);
                     }
                   }
               }
@@ -2000,7 +2123,7 @@ const MainApp = () => {
                         className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs outline-none focus:border-orange-500 appearance-none cursor-pointer"
                     >
                         <option value="Только поездки" className="bg-zinc-900">Только поездки</option>
-                        <option value="Любовный интерес" className="bg-zinc-900">Любовный интерес</option>
+                        <option value="Симпатия и общение" className="bg-zinc-900">Симпатия и общение</option>
                     </select>
                   </div>
                 </div>
@@ -2209,11 +2332,9 @@ const MainApp = () => {
                 </div>
                 <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
                     <MapPinIcon size={18} className="text-zinc-400 flex-shrink-0" />
-                    <input 
-                      type="text" 
+                    <AddressAutocomplete
                       value={newEvent.address}
-                      onChange={(e) => setNewEvent({...newEvent, address: e.target.value})}
-                      className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
+                      onChange={(value) => setNewEvent({...newEvent, address: value})}
                       placeholder="Место встречи"
                     />
                   </div>
@@ -2356,6 +2477,82 @@ const MainApp = () => {
               }} className={`flex flex-col items-center gap-1 transition-colors active:scale-95 ${activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-600'}`}><User size={22}/><span className="text-[9px] font-black uppercase">Профиль</span></button>
       </div>
     </nav>
+      
+      {/* МОДАЛЬНОЕ ОКНО ПРИВЕТСТВИЯ НОВОГО ПОЛЬЗОВАТЕЛЯ */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowWelcomeModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className="relative w-full max-w-md bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Close button */}
+            <button 
+              onClick={() => setShowWelcomeModal(false)}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-all z-10"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-orange-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-4xl font-black text-orange-500">🏍️</span>
+              </div>
+              
+              <h2 className="text-2xl font-black italic uppercase tracking-tight mb-4">
+                Приветствуем в <span className="text-orange-500">МОТОЗНАКОМСТВА</span>
+              </h2>
+              
+              <p className="text-zinc-300 text-lg leading-relaxed mb-8">
+                Добавьте фотографии и заполните профиль, чтобы найти интересных байкеров в вашем городе!
+              </p>
+              
+              <div className="space-y-4 text-left mb-8">
+                <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="w-8 h-8 bg-orange-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-orange-500 font-bold text-sm">1</span>
+                  </div>
+                  <span className="text-sm">Загрузите свои лучшие фото</span>
+                </div>
+                <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="w-8 h-8 bg-orange-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-orange-500 font-bold text-sm">2</span>
+                  </div>
+                  <span className="text-sm">Расскажите о себе и своем байке</span>
+                </div>
+                <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="w-8 h-8 bg-orange-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-orange-500 font-bold text-sm">3</span>
+                  </div>
+                  <span className="text-sm">Начните искать единомышленников</span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setShowWelcomeModal(false);
+                  setActiveTab('profile'); // Переключаем на вкладку профиля
+                }}
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 rounded-2xl shadow-[0_20px_40px_-15px_rgba(234,88,12,0.3)] transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                Заполнить профиль
+                <ArrowRight size={20} />
+              </button>
+              
+              <button 
+                onClick={() => setShowWelcomeModal(false)}
+                className="w-full text-zinc-500 hover:text-zinc-400 text-sm mt-4 transition-colors"
+              >
+                Позже
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Стили для скрытия скроллбара */}
       <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
     </div>
