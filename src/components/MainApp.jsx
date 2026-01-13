@@ -428,7 +428,7 @@ const MainApp = () => {
     return DEFAULT_AVATAR;
   };
 
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null); // Для модального окна просмотра всех фото (чат, галерея, профиль)
   const [onlineUsers, setOnlineUsers] = useState(new Set());
 
   useEffect(() => {
@@ -946,6 +946,41 @@ const MainApp = () => {
       }
     }
   };
+
+  // Функции для навигации по фото в модальном окне
+  const navigateImage = (direction) => {
+    if (!selectedImage || !userImages.length) return;
+    
+    const currentIndex = userImages.indexOf(selectedImage);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = currentIndex < userImages.length - 1 ? currentIndex + 1 : 0;
+    } else {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : userImages.length - 1;
+    }
+    
+    setSelectedImage(userImages[newIndex]);
+  };
+
+  // Обработчик клавиатуры для модального окна
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!selectedImage) return;
+      
+      if (e.key === 'Escape') {
+        setSelectedImage(null);
+      } else if (e.key === 'ArrowLeft') {
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        navigateImage('next');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedImage, userImages]);
 
   const openChat = async (chat) => {
     setSelectedChat(chat);
@@ -2277,13 +2312,14 @@ const MainApp = () => {
                   {userImages.map((img, idx) => {
                     const isMainPhoto = userData?.image === img;
                     return (
-                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group">
+                      <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 relative group cursor-pointer" onClick={() => setSelectedImage(img)}>
                         <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
                         {isMainPhoto && (
                           <div className="absolute top-1 left-1 px-2 py-0.5 bg-orange-600 text-[8px] font-black uppercase rounded">Главное</div>
                         )}
                         <button
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.stopPropagation(); // Предотвращаем открытие модального окна при удалении
                             if (window.confirm('Вы точно хотите удалить фотографию?')) {
                               const newImages = userImages.filter((_, i) => i !== idx);
                               setUserImages(newImages);
@@ -2982,6 +3018,68 @@ const MainApp = () => {
               >
                 Позже
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* МОДАЛЬНОЕ ОКНО ПРОСМОТРА ФОТО */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative max-w-4xl max-h-full w-full h-full flex items-center justify-center">
+            {/* Кнопка предыдущего фото */}
+            {userImages.length > 1 && (
+              <button 
+                onClick={() => navigateImage('prev')}
+                className="absolute left-4 p-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+            
+            <img 
+              src={selectedImage} 
+              alt="Full size photo" 
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+            
+            {/* Кнопка следующего фото */}
+            {userImages.length > 1 && (
+              <button 
+                onClick={() => navigateImage('next')}
+                className="absolute right-4 p-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all"
+              >
+                <ChevronRight size={24} />
+              </button>
+            )}
+            
+            {/* Кнопка закрытия */}
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-4 right-4 p-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-all"
+            >
+              <X size={24} />
+            </button>
+            
+            {/* Индикатор текущего фото */}
+            {userImages.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+                {userImages.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      userImages[index] === selectedImage 
+                        ? 'bg-orange-500 w-6' 
+                        : 'bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* Информация о фото */}
+            <div className="absolute bottom-4 left-4 text-white/70 text-sm">
+              {userImages.indexOf(selectedImage) + 1} / {userImages.length}
             </div>
           </div>
         </div>
