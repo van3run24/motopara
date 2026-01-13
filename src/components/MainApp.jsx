@@ -476,20 +476,39 @@ const MainApp = () => {
 
   useEffect(() => {
           const checkSession = async () => {
-              const { data: { session } } = await supabase.auth.getSession();
+              console.log('Checking session...');
               
-              if (session) {
-                  localStorage.setItem('userId', session.user.id);
+              // Добавляем таймаут для предотвращения бесконечной загрузки
+              const timeout = setTimeout(() => {
+                  console.error('Profile loading timeout - showing error');
+                  setError('Превышено время загрузки профиля. Попробуйте обновить страницу.');
+              }, 10000); // 10 секунд
+              
+              try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  console.log('Session found:', !!session);
                   
-                  // Запрашиваем разрешение на уведомления
-                  await requestNotificationPermission();
-                  
-                  // Load fresh profile data
-                  let { data: user } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
+                  if (session) {
+                      localStorage.setItem('userId', session.user.id);
+                      
+                      // Запрашиваем разрешение на уведомления (не блокируем загрузку)
+                      requestNotificationPermission();
+                      
+                      // Load fresh profile data
+                      console.log('Loading user profile...');
+                      let { data: user, error: userError } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+                      
+                      if (userError) {
+                          console.error('Error loading user profile:', userError);
+                          setError('Ошибка загрузки профиля: ' + userError.message);
+                      }
+                      
+                      console.log('User data loaded:', !!user);
+                      clearTimeout(timeout);
                   
                   // Если профиля нет, создаем его с пустыми полями
                   if (!user) {
@@ -527,8 +546,8 @@ const MainApp = () => {
                     
                     // Повторно пытаемся подписаться на push уведомления после загрузки userData
                     if (Notification.permission === 'granted') {
-                      console.log('Повторная попытка подписки на push уведомления после загрузки профиля');
-                      await subscribeToPushNotifications();
+                      console.log('Повторная попытка подписки на push уведомления после загрузке профиля');
+                      subscribeToPushNotifications();
                     }
                     
                     // Проверяем, новый ли это пользователь (пустой профиль)
@@ -546,6 +565,13 @@ const MainApp = () => {
                         .eq('id', user.id);
                     }
                   }
+              } else {
+                  console.log('No session found');
+                  clearTimeout(timeout);
+              }
+              } catch (error) {
+                  console.error('Error in checkSession:', error);
+                  clearTimeout(timeout);
               }
           };
           checkSession();
@@ -2162,8 +2188,27 @@ const MainApp = () => {
           <div className="h-full overflow-y-auto p-6 animate-in fade-in flex flex-col items-center pt-10">
             {!userData ? (
                 <div className="flex-1 flex flex-col items-center justify-center h-full mt-20">
-                  <Loader2 className="animate-spin text-orange-500 mb-4" size={32} />
-                  <p className="text-zinc-500 text-sm italic">Загрузка профиля...</p>
+                  {error ? (
+                    <>
+                      <div className="text-red-500 text-center mb-4">
+                        <p className="text-sm">{error}</p>
+                        <button 
+                          onClick={() => {
+                            setError(null);
+                            window.location.reload();
+                          }}
+                          className="mt-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm"
+                        >
+                          Обновить страницу
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="animate-spin text-orange-500 mb-4" size={32} />
+                      <p className="text-zinc-500 text-sm italic">Загрузка профиля...</p>
+                    </>
+                  )}
                 </div>
             ) : (
             <>
