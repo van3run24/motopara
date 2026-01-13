@@ -108,10 +108,10 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
 
            if (!interests || !Array.isArray(interests)) {
               interests = [
-                { id: 'style', label: 'Стиль', value: u.temp || 'Спорт', icon: 'Gauge' },
-                { id: 'music', label: 'Музыка', value: u.music || 'Rock', icon: 'Music' },
-                { id: 'equip', label: 'Экип', value: u.equip || 'Full', icon: 'Shield' },
-                { id: 'goal', label: 'Цель', value: u.goal || 'Катка', icon: 'Target' }
+                { id: 'style', label: 'Стиль', value: u.temp || 'Спокойный', icon: 'Gauge' },
+                { id: 'music', label: 'Музыка', value: u.music || 'Рок', icon: 'Music' },
+                { id: 'equip', label: 'Экип', value: u.equip || 'Только шлем', icon: 'Shield' },
+                { id: 'goal', label: 'Цель', value: u.goal || 'Только поездки', icon: 'Target' }
               ];
            }
            

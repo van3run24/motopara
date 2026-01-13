@@ -936,10 +936,10 @@ const MainApp = () => {
        }
        if (!interests || !Array.isArray(interests)) {
           interests = [
-            { id: 'style', label: 'Стиль', value: data.temp || 'Спорт', icon: 'Gauge' },
-            { id: 'music', label: 'Музыка', value: data.music || 'Rock', icon: 'Music' },
-            { id: 'equip', label: 'Экип', value: data.equip || 'Full', icon: 'Shield' },
-            { id: 'goal', label: 'Цель', value: data.goal || 'Катка', icon: 'Target' }
+            { id: 'style', label: 'Стиль', value: data.temp || 'Спокойный', icon: 'Gauge' },
+            { id: 'music', label: 'Музыка', value: data.music || 'Рок', icon: 'Music' },
+            { id: 'equip', label: 'Экип', value: data.equip || 'Только шлем', icon: 'Shield' },
+            { id: 'goal', label: 'Цель', value: data.goal || 'Только поездки', icon: 'Target' }
           ];
        }
        
