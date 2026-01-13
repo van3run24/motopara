@@ -1362,7 +1362,7 @@ const MainApp = () => {
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
             {/* КАРТА */}
-            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-0 z-50 rounded-[32px] m-4' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? 'calc(100vh - 120px)' : '40vh', minHeight: isMapFullscreen ? 'calc(100vh - 120px)' : '300px' }}>
+            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-x-4 inset-y-20 z-50 rounded-[32px]' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? 'calc(100vh - 160px)' : '40vh', minHeight: isMapFullscreen ? 'calc(100vh - 160px)' : '300px' }}>
               {userData && (
                 <>
                   {isMapFullscreen && (
@@ -1380,8 +1380,8 @@ const MainApp = () => {
                       cities.find(c => c.name === userData.city)?.lng || 37.6173
                     ]} 
                     zoom={11} 
-                    style={{ height: '100%', width: '100%' }}
-                    className="z-0"
+                    style={{ height: '100%', width: '100%', zIndex: 1 }}
+                    className="z-1"
                     attributionControl={false}
                   >
                   <TileLayer
