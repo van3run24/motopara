@@ -162,7 +162,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             .from('messages')
             .select('*')
             .eq('chat_id', chat.id)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: true });
           
           console.log(`Loaded ${messages?.length || 0} messages for chat ${chat.id}:`, messages?.map(m => ({id: m.id, sender: m.sender_id, is_read: m.is_read, text: m.text?.substring(0, 30)})));
           
@@ -179,9 +179,9 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             image: partner?.image || null,
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
-            lastMessage: messages?.[0]?.text || 'Начните общение',
-            time: messages?.[0]?.created_at ? 
-              new Date(messages[0].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
+            lastMessage: messages?.length > 0 ? messages[messages.length - 1]?.text || 'Начните общение' : 'Начните общение',
+            time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? 
+              new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
               '',
             unreadCount: messages?.filter(m => {
               const isUnread = m.sender_id !== userId && !m.is_read;
@@ -196,8 +196,10 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       
       // Сортируем чаты по времени последнего сообщения (новые сверху)
       const sortedChats = chatsWithMessages.sort((a, b) => {
-        const timeA = a.time ? new Date(`1970-01-01 ${a.time}`) : new Date(0);
-        const timeB = b.time ? new Date(`1970-01-01 ${b.time}`) : new Date(0);
+        const timeA = a.messages?.length > 0 && a.messages[a.messages.length - 1]?.created_at ? 
+          new Date(a.messages[a.messages.length - 1].created_at) : new Date(0);
+        const timeB = b.messages?.length > 0 && b.messages[b.messages.length - 1]?.created_at ? 
+          new Date(b.messages[b.messages.length - 1].created_at) : new Date(0);
         return timeB - timeA;
       });
       
