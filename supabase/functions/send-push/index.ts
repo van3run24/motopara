@@ -1,15 +1,20 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import webpush from 'https://esm.sh/web-push@3.6.5'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// VAPID ключи (лучше вынести в environment variables)
-const VAPID_PUBLIC_KEY = 'BLc1xPvF8jHq3xL8f9k2mN4p7r6sT5uV8wX2yZ1aQ3bC4dE5fG6hI7jK8lM9nO0p'
-const VAPID_PRIVATE_KEY = 'YOUR_VAPID_PRIVATE_KEY' // Нужно сгенерировать!
-const VAPID_EMAIL = 'your-email@example.com'
+// VAPID ключи из environment variables
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || ''
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || ''
+const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:your-email@example.com'
+
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  console.error('VAPID keys not configured in environment variables')
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -50,40 +55,60 @@ serve(async (req) => {
         subscriptions = data
       }
       
-      // Отправляем push уведомления
+      // Настраиваем VAPID
+      webpush.setVapidDetails(
+        VAPID_SUBJECT,
+        VAPID_PUBLIC_KEY,
+        VAPID_PRIVATE_KEY
+      )
+
+      // Отправляем push уведомления через Web Push Protocol
       const results = []
       
       for (const subscription of subscriptions) {
         try {
+          const pushSubscription = {
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: subscription.p256dh_key,
+              auth: subscription.auth_key
+            }
+          }
+
           const payload = JSON.stringify({
             title: title || 'МОТОЗНАКОМСТВА',
             body: body || 'Новое уведомление',
-            icon: icon || 'https://your-domain.com/favicons/android-chrome-192x192.png',
-            tag: tag || 'default',
-            data: { url: 'https://your-domain.com' }
+            icon: icon || '/favicons/android-chrome-192x192.png',
+            badge: '/favicons/favicon-32x32.png',
+            vibrate: [100, 50, 100],
+            tag: tag || 'motopara-notification',
+            data: { 
+              url: window.location.origin,
+              dateOfArrival: Date.now()
+            }
           })
+
+          await webpush.sendNotification(
+            pushSubscription,
+            payload
+          )
           
-          const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-            method: 'POST',
-            headers: {
-              'Authorization': `key=${Deno.env.get('FCM_SERVER_KEY')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              to: subscription.endpoint,
-              notification: {
-                title: title || 'МОТОЗНАКОМСТВА',
-                body: body || 'Новое уведомление',
-                icon: icon || 'https://your-domain.com/favicons/android-chrome-192x192.png',
-                click_action: 'https://your-domain.com'
-              }
-            })
-          })
-          
-          results.push({ success: response.ok, subscription: subscription.endpoint })
+          results.push({ success: true, subscription: subscription.endpoint })
+          console.log('Push notification sent successfully to:', subscription.endpoint)
         } catch (error) {
-          console.error('Error sending notification:', error)
-          results.push({ success: false, error: error.message, subscription: subscription.endpoint })
+          console.error('Error sending notification to', subscription.endpoint, ':', error)
+          
+          // Если подписка больше не активна, удаляем её
+          if (error && typeof error === 'object' && 'statusCode' in error && 
+              (error.statusCode === 410 || error.statusCode === 404)) {
+            await supabaseClient
+              .from('push_subscriptions')
+              .delete()
+              .eq('endpoint', subscription.endpoint)
+            console.log('Removed inactive subscription:', subscription.endpoint)
+          }
+          
+          results.push({ success: false, error: error instanceof Error ? error.message : String(error), subscription: subscription.endpoint })
         }
       }
       

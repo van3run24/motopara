@@ -296,9 +296,19 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           // Отправляем уведомление для новых сообщений от других пользователей
           if (payload.eventType === 'INSERT' && payload.new.sender_id !== userId) {
             const chatName = payload.new.chat_id; // Здесь можно получить имя чата
+            
+            // Локальное уведомление (если приложение открыто)
             window.supabaseManager.sendNotification(
               'Новое сообщение',
               `У вас новое сообщение в чате`,
+              '/favicons/android-chrome-192x192.png'
+            );
+            
+            // Push уведомление (работает даже если приложение закрыто)
+            window.supabaseManager.sendPushNotification(
+              '🏍️ Новое сообщение',
+              `У вас новое сообщение в чате`,
+              userId, // отправляем конкретному пользователю
               '/favicons/android-chrome-192x192.png'
             );
           }
@@ -377,6 +387,35 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           vibrate: [100, 50, 100],
           tag: 'motopara-notification'
         });
+      }
+    },
+    // Функция для отправки push уведомлений через Supabase Edge Function
+    sendPushNotification: async (title, body, userId = null, icon = '/favicons/android-chrome-192x192.png') => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-push`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            title, 
+            body, 
+            icon,
+            userId 
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to send push notification');
+        }
+        
+        const result = await response.json();
+        console.log('Push notification sent:', result);
+        return result;
+      } catch (error) {
+        console.error('Error sending push notification:', error);
+        return { success: false, error: error.message };
       }
     },
     sendMessage: async (chatId, text, type = 'text', imageUrl = null) => {
