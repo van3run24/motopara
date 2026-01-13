@@ -165,7 +165,46 @@ const MainApp = () => {
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-  // Функция форматирования времени
+  // Запрос разрешения на уведомления
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          console.log('Разрешение на уведомления получено');
+          // Регистрируем Service Worker для push уведомлений
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка запроса разрешения на уведомления:', error);
+      }
+    }
+  };
+
+  // Отправка push уведомления
+  const sendNotification = (title, options = {}) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(title, {
+        body: options.body || 'Новое уведомление',
+        icon: '/favicons/android-chrome-192x192.png',
+        badge: '/favicons/favicon-32x32.png',
+        vibrate: [100, 50, 100],
+        tag: 'motopara-notification',
+        requireInteraction: false,
+        ...options
+      });
+      
+      // Автоматически закрываем через 5 секунд
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+      
+      return notification;
+    }
+    return null;
+  };
   const formatMessageTime = (createdAt) => {
     if (!createdAt) return '';
     
@@ -308,6 +347,9 @@ const MainApp = () => {
               
               if (session) {
                   localStorage.setItem('userId', session.user.id);
+                  
+                  // Запрашиваем разрешение на уведомления
+                  await requestNotificationPermission();
                   
                   // Load fresh profile data
                   let { data: user } = await supabase
@@ -561,6 +603,13 @@ const MainApp = () => {
           setMatchData(likedUser);
           setHasNewMatchNotification(true);
           setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
+          
+          // Отправляем уведомление о новом мэтче
+          sendNotification('🏍️ Новый мэтч!', {
+            body: `У вас новый мэтч: ${likedUser.name}, ${likedUser.age} лет`,
+            icon: likedUser.images?.[0] || DEFAULT_AVATAR,
+            tag: 'new-match'
+          });
         }
       }
     } catch (err) {

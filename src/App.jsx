@@ -5,8 +5,13 @@ import MainApp from './components/MainApp';
 import { supabase } from './supabaseClient';
 
 function App() {
+  // Определяем, запущено ли приложение как PWA
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                 window.navigator.standalone || 
+                 document.referrer.includes('android-app://');
+  
   // Логика для открытия/закрытия окна
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(isPWA); // В PWA сразу открываем модалку
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Состояние входа
   const [showCookies, setShowCookies] = useState(false);
   const howItWorksRef = useRef(null);
