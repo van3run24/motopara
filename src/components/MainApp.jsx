@@ -2287,6 +2287,7 @@ const MainApp = () => {
                         age: userData.age || null,
                         city: userData.city,
                         bike: userData.bike,
+                        has_bike: userData.has_bike,
                         gender: userData.gender,
                         about: userData.about,
                         temp: userData.temp,
