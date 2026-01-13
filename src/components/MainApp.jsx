@@ -337,14 +337,18 @@ const MainApp = () => {
                     }
                     
                     // Проверяем, новый ли это пользователь (пустой профиль)
-                    // Показываем приветствие только если профиль действительно пустой
+                    // Показываем приветствие только если профиль действительно пустой и пользователь еще не видел приветствие
                     const isEmptyProfile = !user.name || !user.age || !user.bio || !user.images || user.images.length === 0;
-                    const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
                     
-                    if (isEmptyProfile && !hasSeenWelcome) {
+                    if (isEmptyProfile && !user.has_seen_welcome) {
                       setIsNewUser(true);
                       setShowWelcomeModal(true);
-                      localStorage.setItem('hasSeenWelcome', 'true');
+                      
+                      // Обновляем флаг в базе данных
+                      await supabase
+                        .from('users')
+                        .update({ has_seen_welcome: true })
+                        .eq('id', user.id);
                     }
                   }
               }
@@ -2042,7 +2046,25 @@ const MainApp = () => {
                 )}
 
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Имя</label><input type="text" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Возраст</label><input type="number" min="18" max="100" value={userData.age || ''} onChange={e => setUserData({...userData, age: parseInt(e.target.value) || 18})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500" /></div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase">Возраст</label>
+                  <input 
+                    type="number" 
+                    min="18" 
+                    max="100" 
+                    value={userData.age || ''} 
+                    onChange={e => {
+                      const age = parseInt(e.target.value);
+                      if (e.target.value === '') {
+                        setUserData({...userData, age: null});
+                      } else if (age >= 18 && age <= 100) {
+                        setUserData({...userData, age});
+                      }
+                    }} 
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none focus:border-orange-500"
+                    placeholder="18+"
+                  />
+                </div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-zinc-600 uppercase">Город</label>
                   <select value={userData.city} onChange={e => setUserData({...userData, city: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none appearance-none cursor-pointer">
                     {cities.map(c => <option key={c.name} value={c.name} className="bg-zinc-900">{c.name}</option>)}
@@ -2151,8 +2173,8 @@ const MainApp = () => {
                     const { error } = await supabase
                       .from('users')
                       .update({
-                        name: userData.name,
-                        age: userData.age,
+                        name: userData.name || null,
+                        age: userData.age || null,
                         city: userData.city,
                         bike: userData.bike,
                         gender: userData.gender,
