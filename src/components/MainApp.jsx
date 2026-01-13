@@ -185,12 +185,13 @@ const MainApp = () => {
     }
   };
 
-  // Отправка push уведомления через API
+  // Отправка push уведомления через Supabase Edge Functions
   const sendPushNotification = async (title, options = {}) => {
     try {
-      const response = await fetch('/api/push/send', {
+      const response = await fetch('https://ikztmdltejodcgxgwzbq.supabase.co/functions/v1/send-push', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjIwODM2NzEwNjd9.YP9DwqV8yucpzzGIvtoj2Sw2RzIAeq2wzbl6_m1tXaBEjLXyWS827IIWe8BBPrkvNWU2JPRCBu4MetcAeFbEBg`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
