@@ -80,6 +80,59 @@ const MainApp = () => {
     }
   };
 
+  // Функция форматирования даты для разделителя
+  const formatDateForSeparator = (createdAt) => {
+    if (!createdAt) return '';
+    
+    const messageDate = new Date(createdAt);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    
+    if (messageDay.getTime() === today.getTime()) {
+      return 'Сегодня';
+    } else if (messageDay.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
+      return 'Вчера';
+    } else {
+      return messageDate.toLocaleDateString('ru-RU', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long' 
+      });
+    }
+  };
+
+  // Группировка сообщений по датам
+  const groupMessagesByDate = (messages) => {
+    if (!messages || messages.length === 0) return [];
+    
+    const grouped = [];
+    let currentDate = null;
+    
+    messages.forEach((message, index) => {
+      const messageDate = new Date(message.created_at);
+      const dateKey = messageDate.toDateString();
+      
+      // Если это новая дата, добавляем разделитель
+      if (dateKey !== currentDate) {
+        currentDate = dateKey;
+        grouped.push({
+          type: 'separator',
+          date: formatDateForSeparator(message.created_at),
+          created_at: message.created_at
+        });
+      }
+      
+      // Добавляем само сообщение
+      grouped.push({
+        type: 'message',
+        ...message
+      });
+    });
+    
+    return grouped;
+  };
+
   // Функция геокодирования адреса через Yandex API
   const geocodeAddress = async (address) => {
     if (!address) return null;
@@ -1516,7 +1569,19 @@ const MainApp = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col scrollbar-hide">
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
                 <>
-              {selectedChat.messages.map((msg, idx) => (
+              {groupMessagesByDate(selectedChat.messages).map((item, idx) => {
+                if (item.type === 'separator') {
+                  return (
+                    <div key={`sep-${idx}`} className="flex items-center justify-center my-4">
+                      <div className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-xs font-medium">
+                        {item.date}
+                      </div>
+                    </div>
+                  );
+                }
+                
+                const msg = item;
+                return (
                     <div 
                         key={msg.id || idx} 
                         className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
@@ -1572,8 +1637,10 @@ const MainApp = () => {
                         </div>
                       )}
                     </div>
-                  ))}
-                  <div ref={messagesEndRef} />
+                  );
+                });
+              })}
+              <div ref={messagesEndRef} />
                 </>
               ) : (
                 <div className="flex-1 flex items-center justify-center">

@@ -224,8 +224,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       // Автоудаление прошедших событий
       const { error: deleteError } = await supabase
         .from('events')
-        .lt('date', new Date().toISOString().split('T')[0])
-        .delete();
+        .select()
+        .lt('date', new Date().toISOString().split('T')[0]);
         
       if (deleteError) {
         console.error('Error deleting old events:', deleteError);
