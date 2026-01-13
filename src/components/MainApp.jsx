@@ -1362,7 +1362,7 @@ const MainApp = () => {
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
             {/* КАРТА */}
-            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-0 z-50 rounded-[32px]' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? '100vh' : '40vh', minHeight: isMapFullscreen ? '100vh' : '300px' }}>
+            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-4 z-50 rounded-[32px]' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? 'calc(100vh - 32px)' : '40vh', minHeight: isMapFullscreen ? 'calc(100vh - 32px)' : '300px' }}>
               {userData && (
                 <>
                   {isMapFullscreen && (
