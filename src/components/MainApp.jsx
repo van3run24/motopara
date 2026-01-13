@@ -23,22 +23,18 @@ const AddressAutocomplete = ({ value, onChange, placeholder }) => {
 
     setLoading(true);
     try {
-      // Используем 2GIS API для автоподстановки адресов (бесплатный)
-      const response = await fetch(
-        `https://catalog.api.2gis.com/3.0/items?q=${encodeURIComponent(query)}&type=address&region_id=1&limit=5&key=ruhxhd1483`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        const addresses = data.result?.map(item => {
-          // Форматируем адрес в удобный вид
-          const fullName = item.name || '';
-          const addressText = item.address_name || item.description || fullName;
-          return addressText;
-        }).filter(addr => addr && addr.length > 3).slice(0, 5);
+      // Используем Яндекс Карты API для подсказок (если есть ключ)
+      if (process.env.REACT_APP_YANDEX_API_KEY) {
+        const response = await fetch(
+          `https://suggest-maps.yandex.ru/v1/suggest?apikey=${process.env.REACT_APP_YANDEX_API_KEY}&text=${encodeURIComponent(query)}&type=geo&results=5`
+        );
         
-        setSuggestions(addresses);
-        return;
+        if (response.ok) {
+          const data = await response.json();
+          const addresses = data.results?.map(item => item.text) || [];
+          setSuggestions(addresses.slice(0, 5));
+          return;
+        }
       }
       
       // Fallback: простые но полезные подсказки на основе города
@@ -52,7 +48,11 @@ const AddressAutocomplete = ({ value, onChange, placeholder }) => {
         `ресторан ${query}`,
         `парк ${query}`,
         `ТЦ ${query}`,
-        `${query} центр`
+        `${query} центр`,
+        `м. ${query}`,
+        `ул. ${query}`,
+        `пр. ${query}`,
+        `пл. ${query}`
       ];
       
       setSuggestions(citySuggestions.slice(0, 5));
