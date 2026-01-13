@@ -13,32 +13,21 @@ delete L.Icon.Default.prototype._getIconUrl;
 
 // Создаем кастомные иконки
 const createCustomIcon = (color, isUser = false) => {
-  const iconEmoji = isUser ? '🏍️' : (color === '#ec4899' ? '👩‍🦰' : '👨‍🦰');
-  
   return L.divIcon({
     html: `
       <div style="
         background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%);
-        width: ${isUser ? '40px' : '32px'};
-        height: ${isUser ? '40px' : '32px'};
+        width: ${isUser ? '20px' : '16px'};
+        height: ${isUser ? '20px' : '16px'};
         border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: ${isUser ? '20px' : '14px'};
-        transform: translateY(-50%);
-        position: relative;
-        z-index: 1000;
-      ">
-        ${iconEmoji}
-      </div>
+        border: ${isUser ? '3px' : '2px'} solid white;
+        box-shadow: 0 ${isUser ? '2px 8px' : '2px 6px'} rgba(0,0,0,0.3);
+      "></div>
     `,
     className: 'custom-marker',
-    iconSize: [isUser ? 40 : 32, isUser ? 40 : 32],
-    iconAnchor: [isUser ? 20 : 16, isUser ? 40 : 32],
-    popupAnchor: [0, -30],
+    iconSize: [isUser ? 20 : 16, isUser ? 20 : 16],
+    iconAnchor: [isUser ? 10 : 8, isUser ? 10 : 8],
+    popupAnchor: [0, isUser ? -10 : -8],
     shadowSize: [0, 0]
   });
 };
@@ -1637,9 +1626,10 @@ const MainApp = () => {
                         </div>
                       )}
                     </div>
-                  );
-                });
-              })}
+                      );
+                    }
+                })
+              )}
               <div ref={messagesEndRef} />
                 </>
               ) : (
