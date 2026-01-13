@@ -163,6 +163,7 @@ const MainApp = () => {
   const [isNewUser, setIsNewUser] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   // Запрос разрешения на уведомления
@@ -1361,18 +1362,28 @@ const MainApp = () => {
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
             {/* КАРТА */}
-            <div className="relative bg-[#0a0a0a] mx-4 mt-4 rounded-[32px] border border-white/10 overflow-hidden" style={{ height: '40vh', minHeight: '300px' }}>
+            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? '100vh' : '40vh', minHeight: isMapFullscreen ? '100vh' : '300px' }}>
               {userData && (
-                <MapContainer 
-                  center={userLocation ? [userLocation.lat, userLocation.lng] : [
-                    cities.find(c => c.name === userData.city)?.lat || 55.7558, 
-                    cities.find(c => c.name === userData.city)?.lng || 37.6173
-                  ]} 
-                  zoom={11} 
-                  style={{ height: '100%', width: '100%' }}
-                  className="z-0"
-                  attributionControl={false}
-                >
+                <>
+                  {isMapFullscreen && (
+                    <button
+                      onClick={() => setIsMapFullscreen(false)}
+                      className="absolute top-4 right-4 z-[1000] bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-full text-white hover:bg-white/20 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+                  
+                  <MapContainer 
+                    center={userLocation ? [userLocation.lat, userLocation.lng] : [
+                      cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                      cities.find(c => c.name === userData.city)?.lng || 37.6173
+                    ]} 
+                    zoom={11} 
+                    style={{ height: '100%', width: '100%' }}
+                    className="z-0"
+                    attributionControl={false}
+                  >
                   <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                     attribution=""
@@ -1492,19 +1503,30 @@ const MainApp = () => {
                    })}
                    */}
                 </MapContainer>
+                </>
               )}
               
-              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
-                <Navigation className="text-orange-500" size={18} />
-                <div>
-                  <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
-                  <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
+              {!isMapFullscreen && (
+                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
+                  <Navigation className="text-orange-500" size={18} />
+                  <div className="flex-1">
+                    <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
+                  </div>
+                  <button
+                    onClick={() => setIsMapFullscreen(true)}
+                    className="bg-orange-600 p-2 rounded-full text-white hover:bg-orange-700 transition-colors"
+                    title="Открыть на полный экран"
+                  >
+                    <Navigation size={16} />
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* СЕКЦИЯ СОБЫТИЙ */}
-            <div className="px-4 mt-6 pb-6">
+            {/* СЕКЦИЯ СОБЫТИЙ - только не в полноэкранном режиме */}
+            {!isMapFullscreen && (
+              <div className="px-4 mt-6 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">События в вашем городе</h3>
                 <button 
@@ -1605,7 +1627,8 @@ const MainApp = () => {
                   </div>
                 )}
               </div>
-            </div>
+              </div>
+            )}
           </div>
         )}
 
