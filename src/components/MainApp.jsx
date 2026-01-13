@@ -102,22 +102,6 @@ const MainApp = () => {
     return null;
   };
 
-  // Мемоизированные события с координатами
-  const eventsWithCoords = useMemo(async () => {
-    const eventsWithLocation = await Promise.all(
-      events.map(async (event) => {
-        if (event.coordinates) {
-          return event;
-        }
-        
-        const coords = await geocodeAddress(event.address);
-        return { ...event, coordinates: coords };
-      })
-    );
-    
-    return eventsWithLocation.filter(event => event.coordinates);
-  }, [events]);
-
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
     if (user.image) return user.image;
@@ -1189,7 +1173,8 @@ const MainApp = () => {
                       );
                    })}
                    
-                   {/* Events Markers */}
+                   {/* Events Markers - временно отключаем геокодирование */}
+                   {/* 
                    {events.filter(e => e.coordinates && e.city === userData?.city).map((event, idx) => {
                       const eventIcon = L.divIcon({
                         html: `
@@ -1253,6 +1238,7 @@ const MainApp = () => {
                         </Marker>
                       );
                    })}
+                   */}
                 </MapContainer>
               )}
               
