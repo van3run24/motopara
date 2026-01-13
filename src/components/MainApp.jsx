@@ -112,12 +112,44 @@ const MainApp = () => {
     return grouped;
   };
 
+  // Функция получения предложений адресов от Яндекс Карт
+  const fetchAddressSuggestions = async (query) => {
+    if (!query || query.length < 3) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    try {
+      // Используем демо-ключ Яндекс Карт для геокодирования
+      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=demo&geocode=${encodeURIComponent(query)}&format=json&results=5`);
+      const data = await response.json();
+      
+      if (data.response?.GeoObjectCollection?.featureMember?.length > 0) {
+        const suggestions = data.response.GeoObjectCollection.featureMember.map(item => ({
+          name: item.GeoObject.name,
+          description: item.GeoObject.description,
+          fullAddress: `${item.GeoObject.name}${item.GeoObject.description ? ', ' + item.GeoObject.description : ''}`
+        }));
+        setAddressSuggestions(suggestions);
+        setShowAddressSuggestions(true);
+      } else {
+        setAddressSuggestions([]);
+        setShowAddressSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error fetching address suggestions:', error);
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+    }
+  };
+
   // Функция геокодирования адреса через Yandex API
   const geocodeAddress = async (address) => {
     if (!address) return null;
     
     try {
-      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=YOUR_YANDEX_API_KEY&geocode=${encodeURIComponent(address)}&format=json`);
+      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=demo&geocode=${encodeURIComponent(address)}&format=json`);
       const data = await response.json();
       
       if (data.response.GeoObjectCollection.featureMember.length > 0) {
@@ -133,6 +165,46 @@ const MainApp = () => {
     
     return null;
   };
+
+  // Функция для добавления координат к событиям
+  const eventsWithCoordinates = useMemo(() => {
+    return events.map(event => ({
+      ...event,
+      coordinates: event.coordinates || null // Будет заполняться при загрузке
+    }));
+  }, [events]);
+
+  // Геокодируем адреса событий при их загрузке
+  useEffect(() => {
+    const geocodeEvents = async () => {
+      const eventsToGeocode = events.filter(event => !event.coordinates && event.address);
+      
+      if (eventsToGeocode.length === 0) return;
+      
+      const updatedEvents = await Promise.all(
+        events.map(async (event) => {
+          if (!event.coordinates && event.address) {
+            const coords = await geocodeAddress(event.address);
+            return { ...event, coordinates: coords };
+          }
+          return event;
+        })
+      );
+      
+      // Обновляем только если есть новые координаты
+      const hasNewCoordinates = updatedEvents.some((event, index) => 
+        event.coordinates !== events[index]?.coordinates
+      );
+      
+      if (hasNewCoordinates) {
+        setEvents(updatedEvents);
+      }
+    };
+
+    if (events.length > 0) {
+      geocodeEvents();
+    }
+  }, [events.length]); // Запускаем при изменении количества событий
 
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
@@ -243,6 +315,9 @@ const MainApp = () => {
   const [newMatches, setNewMatches] = useState([]);
 
   const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [isFullscreenMap, setIsFullscreenMap] = useState(false);
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const chatFileInputRef = useRef(null);
@@ -1141,14 +1216,22 @@ const MainApp = () => {
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
             {/* КАРТА */}
-            <div className="relative bg-[#0a0a0a] mx-4 mt-4 rounded-[32px] border border-white/10 overflow-hidden" style={{ height: '40vh', minHeight: '300px' }}>
+            <div className={`relative bg-[#0a0a0a] ${isFullscreenMap ? 'fixed inset-0 z-50 m-0 rounded-none' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isFullscreenMap ? '100vh' : '40vh', minHeight: isFullscreenMap ? '100vh' : '300px' }}>
+              {/* Кнопка полноэкранного режима */}
+              <button
+                onClick={() => setIsFullscreenMap(!isFullscreenMap)}
+                className="absolute top-4 right-4 z-[20] bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                {isFullscreenMap ? <X size={18} className="text-white" /> : <Navigation size={18} className="text-white" />}
+              </button>
+              
               {userData && (
                 <MapContainer 
                   center={userLocation ? [userLocation.lat, userLocation.lng] : [
                     cities.find(c => c.name === userData.city)?.lat || 55.7558, 
                     cities.find(c => c.name === userData.city)?.lng || 37.6173
                   ]} 
-                  zoom={11} 
+                  zoom={isFullscreenMap ? 12 : 11} 
                   style={{ height: '100%', width: '100%' }}
                   className="z-0"
                   attributionControl={false}
@@ -1205,9 +1288,8 @@ const MainApp = () => {
                       );
                    })}
                    
-                   {/* Events Markers - временно отключаем геокодирование */}
-                   {/* 
-                   {events.filter(e => e.coordinates && e.city === userData?.city).map((event, idx) => {
+                   {/* Events Markers - активируем! */}
+                   {eventsWithCoordinates.filter(e => e.coordinates && e.city === userData?.city).map((event, idx) => {
                       const eventIcon = L.divIcon({
                         html: `
                           <div style="
@@ -1256,31 +1338,53 @@ const MainApp = () => {
                                     <span>{event.address}</span>
                                   </div>
                                 </div>
-                                {event.link && (
+                                <div className="flex gap-2 mt-3">
                                   <button 
-                                    onClick={() => window.open(event.link, '_blank')}
-                                    className="w-full mt-3 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors"
+                                    onClick={() => {
+                                      navigator.geolocation.getCurrentPosition(
+                                        (position) => {
+                                          const lat = position.coords.latitude;
+                                          const lng = position.coords.longitude;
+                                          const yandexNavigatorUrl = `https://yandex.ru/navi/?ll=${lng},${lat}&route=${lat},${lng}~${encodeURIComponent(event.address)}`;
+                                          window.open(yandexNavigatorUrl, '_blank');
+                                        },
+                                        () => {
+                                          const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(event.address)}&rtm=auto`;
+                                          window.open(yandexMapsUrl, '_blank');
+                                        }
+                                      );
+                                    }}
+                                    className="flex-1 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors"
                                   >
-                                    Подробнее
+                                    Маршрут
                                   </button>
-                                )}
+                                  {event.link && (
+                                    <button 
+                                      onClick={() => window.open(event.link, '_blank')}
+                                      className="flex-1 bg-white/10 text-white py-2 rounded-lg text-sm font-bold hover:bg-white/20 transition-colors"
+                                    >
+                                      Подробнее
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </Popup>
                         </Marker>
                       );
                    })}
-                   */}
                 </MapContainer>
               )}
               
-              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
-                <Navigation className="text-orange-500" size={18} />
-                <div>
-                  <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
-                  <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
+              {!isFullscreenMap && (
+                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
+                  <Navigation className="text-orange-500" size={18} />
+                  <div>
+                    <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* СЕКЦИЯ СОБЫТИЙ */}
@@ -1332,16 +1436,22 @@ const MainApp = () => {
                       {event.address && (
                         <button 
                           onClick={() => {
-                            // Используем Яндекс Навигатор для построения маршрута
-                            const yandexNavigatorUrl = `https://yandex.ru/navi/?route=${encodeURIComponent(event.address)}`;
-                            // Fallback на Яндекс Карты, если Навигатор не установлен
-                            const yandexMapsUrl = `https://yandex.ru/maps/?whatshere[point]=${encodeURIComponent(event.address)}&whatshere[zoom]=17`;
-                            
-                            // Сначала пробуем открыть Навигатор, потом Карты
-                            window.open(yandexNavigatorUrl, '_blank');
-                            setTimeout(() => {
-                              window.open(yandexMapsUrl, '_blank');
-                            }, 100);
+                            // Получаем текущее местоположение пользователя
+                            navigator.geolocation.getCurrentPosition(
+                              (position) => {
+                                const lat = position.coords.latitude;
+                                const lng = position.coords.longitude;
+                                // Строим маршрут от текущего местоположения до адреса события
+                                const yandexNavigatorUrl = `https://yandex.ru/navi/?ll=${lng},${lat}&route=${lat},${lng}~${encodeURIComponent(event.address)}`;
+                                window.open(yandexNavigatorUrl, '_blank');
+                              },
+                              (error) => {
+                                // Если не удалось получить геолокацию, используем запасной вариант
+                                console.log('Could not get location, using fallback');
+                                const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(event.address)}&rtm=auto`;
+                                window.open(yandexMapsUrl, '_blank');
+                              }
+                            );
                           }}
                           className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
@@ -2202,16 +2312,52 @@ const MainApp = () => {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="relative">
+                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
                     <MapPinIcon size={18} className="text-zinc-400 flex-shrink-0" />
                     <input 
                       type="text" 
                       value={newEvent.address}
-                      onChange={(e) => setNewEvent({...newEvent, address: e.target.value})}
+                      onChange={(e) => {
+                        setNewEvent({...newEvent, address: e.target.value});
+                        fetchAddressSuggestions(e.target.value);
+                      }}
+                      onFocus={() => {
+                        if (addressSuggestions.length > 0) {
+                          setShowAddressSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        // Задержка чтобы успеть кликнуть на предложение
+                        setTimeout(() => setShowAddressSuggestions(false), 200);
+                      }}
                       className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
                       placeholder="Место встречи"
                     />
                   </div>
+                  
+                  {/* Выпадающий список с предложениями */}
+                  {showAddressSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                      {addressSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setNewEvent({...newEvent, address: suggestion.fullAddress});
+                            setAddressSuggestions([]);
+                            setShowAddressSuggestions(false);
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
+                        >
+                          <div className="text-sm text-white font-medium">{suggestion.name}</div>
+                          {suggestion.description && (
+                            <div className="text-xs text-zinc-400">{suggestion.description}</div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Ссылка на организатора</label>
                   <input 
