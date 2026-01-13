@@ -49,12 +49,24 @@ const MainApp = () => {
   const [userLocation, setUserLocation] = useState(null);
   const DEFAULT_AVATAR = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-  // Функция форматирования времени
+  // Функция форматирования даты и времени
   const formatMessageTime = (createdAt) => {
     if (!createdAt) return '';
     
     const messageDate = new Date(createdAt);
-    return messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    
+    const time = messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    
+    if (messageDay.getTime() === today.getTime()) {
+      return time; // Сегодня - только время
+    } else if (messageDay.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
+      return `Вчера, ${time}`; // Вчера
+    } else {
+      return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + `, ${time}`;
+    }
   };
 
   // Функция форматирования даты для разделителя
@@ -1543,7 +1555,7 @@ const MainApp = () => {
                 </div>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col justify-end scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col scrollbar-hide">
               {selectedChat.messages && selectedChat.messages.length > 0 ? (
                 <>
               {groupMessagesByDate(selectedChat.messages).map((item, idx) => {
@@ -1614,8 +1626,8 @@ const MainApp = () => {
                         </div>
                       )}
                     </div>
-                );
-              })}
+                  );
+                }
               )}
               <div ref={messagesEndRef} />
                 </>
