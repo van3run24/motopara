@@ -3,7 +3,7 @@ import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { cities } from '../data/cities';
 
-const AuthModal = ({ isOpen, onClose, onLogin }) => {
+const AuthModal = ({ isOpen, onClose, onLogin, isPWA }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -140,21 +140,25 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
-        onClick={onClose}
-      />
+      {/* Backdrop - в PWA нельзя закрыть */}
+      {!isPWA && (
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          onClick={onClose}
+        />
+      )}
 
       {/* Modal */}
       <div className="relative w-full max-w-md bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-        {/* Close button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-all z-10"
-        >
-          <X size={20} />
-        </button>
+        {/* Close button - в PWA не показываем */}
+        {!isPWA && (
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-all z-10"
+          >
+            <X size={20} />
+          </button>
+        )}
 
         <div className="p-8">
           <div className="text-center mb-8">

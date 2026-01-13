@@ -15,6 +15,14 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Состояние входа
   const [showCookies, setShowCookies] = useState(false);
   const howItWorksRef = useRef(null);
+  
+  // В PWA режиме запрещаем закрытие модалки входа
+  const handleModalClose = () => {
+    if (!isPWA) {
+      setIsAuthModalOpen(false);
+    }
+    // В PWA модалку нельзя закрыть
+  };
 
   useEffect(() => {
     // Проверка сессии при загрузке
@@ -243,8 +251,9 @@ function App() {
       {/* Само модальное окно */}
      <AuthModal 
         isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+        onClose={handleModalClose} 
         onLogin={() => setIsLoggedIn(true)} 
+        isPWA={isPWA}
       />
 
       {/* Контакты */}
