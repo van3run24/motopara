@@ -52,7 +52,6 @@ CREATE TABLE events (
   date DATE NOT NULL,
   time TIME NOT NULL,
   address TEXT,
-  coordinates POINT, -- Добавляем поле для координат
   link TEXT,
   created_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -76,12 +75,8 @@ CREATE INDEX idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
 CREATE INDEX idx_events_city ON events(city);
 CREATE INDEX idx_events_date ON events(date);
-CREATE INDEX idx_events_coordinates ON events USING GIN (coordinates); -- Индекс для геопоиска
 CREATE INDEX idx_likes_from ON likes(from_user_id);
 CREATE INDEX idx_likes_to ON likes(to_user_id);
-
--- Миграция для добавления поля coordinates (если таблица уже существует)
--- ALTER TABLE events ADD COLUMN coordinates POINT;
 
 -- RLS (Row Level Security) политики
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;

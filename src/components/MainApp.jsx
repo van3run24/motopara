@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Plus, Calendar, Clock, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
@@ -112,56 +112,19 @@ const MainApp = () => {
     return grouped;
   };
 
-  // Функция получения предложений адресов от Яндекс Карт
-  const fetchAddressSuggestions = async (query) => {
-    if (!query || query.length < 3) {
-      setAddressSuggestions([]);
-      setShowAddressSuggestions(false);
-      return;
-    }
-
-    try {
-      // Используем демо-ключ Яндекс Карт для геокодирования
-      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=demo&geocode=${encodeURIComponent(query)}&format=json&results=5`);
-      const data = await response.json();
-      
-      if (data.response?.GeoObjectCollection?.featureMember?.length > 0) {
-        const suggestions = data.response.GeoObjectCollection.featureMember.map(item => ({
-          name: item.GeoObject.name,
-          description: item.GeoObject.description,
-          fullAddress: `${item.GeoObject.name}${item.GeoObject.description ? ', ' + item.GeoObject.description : ''}`
-        }));
-        setAddressSuggestions(suggestions);
-        setShowAddressSuggestions(true);
-      } else {
-        setAddressSuggestions([]);
-        setShowAddressSuggestions(false);
-      }
-    } catch (error) {
-      console.error('Error fetching address suggestions:', error);
-      setAddressSuggestions([]);
-      setShowAddressSuggestions(false);
-    }
-  };
-
   // Функция геокодирования адреса через Yandex API
   const geocodeAddress = async (address) => {
     if (!address) return null;
     
     try {
-      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=demo&geocode=${encodeURIComponent(address)}&format=json`);
+      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=YOUR_YANDEX_API_KEY&geocode=${encodeURIComponent(address)}&format=json`);
       const data = await response.json();
       
       if (data.response.GeoObjectCollection.featureMember.length > 0) {
         const coords = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos.split(' ');
-        const lng = parseFloat(coords[0]);
-        const lat = parseFloat(coords[1]);
-        
-        // Возвращаем в формате PostGIS POINT
         return {
-          lat: lat,
-          lng: lng,
-          point: `POINT(${lng} ${lat})` // PostGIS формат
+          lat: parseFloat(coords[1]),
+          lng: parseFloat(coords[0])
         };
       }
     } catch (error) {
@@ -170,38 +133,6 @@ const MainApp = () => {
     
     return null;
   };
-
-  // Функция для добавления координат к событиям
-  const eventsWithCoordinates = useMemo(() => {
-    return events.map(event => {
-      let coords = null;
-      
-      // Если координаты есть в PostGIS формате, извлекаем lat/lng
-      if (event.coordinates && typeof event.coordinates === 'string') {
-        const match = event.coordinates.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
-        if (match) {
-          coords = {
-            lng: parseFloat(match[1]),
-            lat: parseFloat(match[2])
-          };
-        }
-      } else if (event.coordinates && event.coordinates.lat && event.coordinates.lng) {
-        // Если координаты уже в правильном формате
-        coords = {
-          lat: event.coordinates.lat,
-          lng: event.coordinates.lng
-        };
-      }
-      
-      return {
-        ...event,
-        coordinates: coords
-      };
-    });
-  }, [events]);
-
-  // Геокодирование событий будет происходить при их создании/обновлении в SupabaseManager
-  // Убираем useEffect здесь чтобы избежать бесконечных циклов
 
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
@@ -287,7 +218,7 @@ const MainApp = () => {
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
-  const [matchNotificationVisible, setMatchNotificationVisible] = useState(false);
+  const [hasNewMatchNotification, setHasNewMatchNotification] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -312,9 +243,6 @@ const MainApp = () => {
   const [newMatches, setNewMatches] = useState([]);
 
   const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
-  const [addressSuggestions, setAddressSuggestions] = useState([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [isFullscreenMap, setIsFullscreenMap] = useState(false);
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const chatFileInputRef = useRef(null);
@@ -400,9 +328,7 @@ const MainApp = () => {
     // Reset typing state when chat changes
     setIsPartnerTyping(false);
 
-    let unsubscribe = null; // Объявляем переменную заранее
-    
-    unsubscribe = window.supabaseManager.subscribeToTyping(selectedChat.id, (payload) => {
+    const unsubscribe = window.supabaseManager.subscribeToTyping(selectedChat.id, (payload) => {
       setIsPartnerTyping(true);
       
       if (typingTimeoutRef.current) {
@@ -534,7 +460,7 @@ const MainApp = () => {
           setChats(prev => [...prev, chatData]);
           
           setMatchData(likedUser);
-          setMatchNotificationVisible(true);
+          setHasNewMatchNotification(true);
           setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
         }
       }
@@ -1214,22 +1140,15 @@ const MainApp = () => {
         {/* КАРТА */}
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
-            <div className={`relative bg-[#0a0a0a] ${isFullscreenMap ? 'fixed inset-0 z-50 m-0 rounded-none' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isFullscreenMap ? '100vh' : '40vh', minHeight: isFullscreenMap ? '100vh' : '300px' }}>
-              {/* Кнопка полноэкранного режима */}
-              <button
-                onClick={() => setIsFullscreenMap(!isFullscreenMap)}
-                className="absolute top-4 right-4 z-[20] bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-xl hover:bg-white/10 transition-colors"
-              >
-                {isFullscreenMap ? <X size={18} className="text-white" /> : <Navigation size={18} className="text-white" />}
-              </button>
-              
+            {/* КАРТА */}
+            <div className="relative bg-[#0a0a0a] mx-4 mt-4 rounded-[32px] border border-white/10 overflow-hidden" style={{ height: '40vh', minHeight: '300px' }}>
               {userData && (
                 <MapContainer 
                   center={userLocation ? [userLocation.lat, userLocation.lng] : [
                     cities.find(c => c.name === userData.city)?.lat || 55.7558, 
                     cities.find(c => c.name === userData.city)?.lng || 37.6173
                   ]} 
-                  zoom={isFullscreenMap ? 12 : 11} 
+                  zoom={11} 
                   style={{ height: '100%', width: '100%' }}
                   className="z-0"
                   attributionControl={false}
@@ -1285,23 +1204,86 @@ const MainApp = () => {
                         </Marker>
                       );
                    })}
+                   
+                   {/* Events Markers - временно отключаем геокодирование */}
+                   {/* 
+                   {events.filter(e => e.coordinates && e.city === userData?.city).map((event, idx) => {
+                      const eventIcon = L.divIcon({
+                        html: `
+                          <div style="
+                            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                            border: 3px solid white;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 16px;
+                            transform: translateY(-50%);
+                            position: relative;
+                            z-index: 1000;
+                          ">
+                            📅
+                          </div>
+                        `,
+                        className: 'event-marker',
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 36],
+                        popupAnchor: [0, -30],
+                        shadowSize: [0, 0]
+                      });
+                      
+                      return (
+                        <Marker 
+                          key={event.id} 
+                          position={[event.coordinates.lat, event.coordinates.lng]} 
+                          icon={eventIcon}
+                        >
+                          <Popup className="custom-popup">
+                            <div className="w-56 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10">
+                              <div className="p-4">
+                                <h3 className="font-black text-lg mb-2">{event.title}</h3>
+                                <p className="text-sm text-zinc-300 mb-3 line-clamp-2">{event.description}</p>
+                                <div className="space-y-2 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-orange-500" />
+                                    <span>{event.date} в {event.time}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-orange-500" />
+                                    <span>{event.address}</span>
+                                  </div>
+                                </div>
+                                {event.link && (
+                                  <button 
+                                    onClick={() => window.open(event.link, '_blank')}
+                                    className="w-full mt-3 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors"
+                                  >
+                                    Подробнее
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                   })}
+                   */}
                 </MapContainer>
               )}
               
-              {!isFullscreenMap && (
-                <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
-                  <Navigation className="text-orange-500" size={18} />
-                  <div>
-                    <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
-                    <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
-                  </div>
+              <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-xl border border-white/10 p-4 rounded-[24px] flex items-center gap-3 z-[10]">
+                <Navigation className="text-orange-500" size={18} />
+                <div>
+                  <p className="text-xs font-black uppercase italic text-white">Байкеры рядом</p>
+                  <p className="text-[10px] text-zinc-500 uppercase">В сети: {bikers.filter(b => b.city === userData?.city).length}</p>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* СЕКЦИЯ СОБЫТИЙ */}
+            {/* СЕКЦИЯ СОБЫТИЙ */}
             <div className="px-4 mt-6 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">События в вашем городе</h3>
@@ -1350,22 +1332,16 @@ const MainApp = () => {
                       {event.address && (
                         <button 
                           onClick={() => {
-                            // Получаем текущее местоположение пользователя
-                            navigator.geolocation.getCurrentPosition(
-                              (position) => {
-                                const lat = position.coords.latitude;
-                                const lng = position.coords.longitude;
-                                // Строим маршрут от текущего местоположения до адреса события
-                                const yandexNavigatorUrl = `https://yandex.ru/navi/?ll=${lng},${lat}&route=${lat},${lng}~${encodeURIComponent(event.address)}`;
-                                window.open(yandexNavigatorUrl, '_blank');
-                              },
-                              (error) => {
-                                // Если не удалось получить геолокацию, используем запасной вариант
-                                console.log('Could not get location, using fallback');
-                                const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(event.address)}&rtm=auto`;
-                                window.open(yandexMapsUrl, '_blank');
-                              }
-                            );
+                            // Используем Яндекс Навигатор для построения маршрута
+                            const yandexNavigatorUrl = `https://yandex.ru/navi/?route=${encodeURIComponent(event.address)}`;
+                            // Fallback на Яндекс Карты, если Навигатор не установлен
+                            const yandexMapsUrl = `https://yandex.ru/maps/?whatshere[point]=${encodeURIComponent(event.address)}&whatshere[zoom]=17`;
+                            
+                            // Сначала пробуем открыть Навигатор, потом Карты
+                            window.open(yandexNavigatorUrl, '_blank');
+                            setTimeout(() => {
+                              window.open(yandexMapsUrl, '_blank');
+                            }, 100);
                           }}
                           className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
@@ -2226,52 +2202,16 @@ const MainApp = () => {
                     />
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-                    <MapPin size={18} className="text-zinc-400 flex-shrink-0" />
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
+                    <MapPinIcon size={18} className="text-zinc-400 flex-shrink-0" />
                     <input 
                       type="text" 
                       value={newEvent.address}
-                      onChange={(e) => {
-                        setNewEvent({...newEvent, address: e.target.value});
-                        fetchAddressSuggestions(e.target.value);
-                      }}
-                      onFocus={() => {
-                        if (addressSuggestions.length > 0) {
-                          setShowAddressSuggestions(true);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Задержка чтобы успеть кликнуть на предложение
-                        setTimeout(() => setShowAddressSuggestions(false), 200);
-                      }}
+                      onChange={(e) => setNewEvent({...newEvent, address: e.target.value})}
                       className="flex-1 bg-transparent text-sm outline-none text-white placeholder-zinc-500"
                       placeholder="Место встречи"
                     />
                   </div>
-                  
-                  {/* Выпадающий список с предложениями */}
-                  {showAddressSuggestions && addressSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto">
-                      {addressSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setNewEvent({...newEvent, address: suggestion.fullAddress});
-                            setAddressSuggestions([]);
-                            setShowAddressSuggestions(false);
-                          }}
-                          className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
-                        >
-                          <div className="text-sm text-white font-medium">{suggestion.name}</div>
-                          {suggestion.description && (
-                            <div className="text-xs text-zinc-400">{suggestion.description}</div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 <div>
                   <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Ссылка на организатора</label>
                   <input 
@@ -2390,7 +2330,7 @@ const MainApp = () => {
                 setActiveTab('chats'); 
                 setSelectedChat(null); 
                 setMatchData(null); 
-                setMatchNotificationVisible(false); 
+                setHasNewMatchNotification(false); 
                 setSwipedChatId(null); 
                 setShowSettings(false); 
                 setShowAppSettings(false); 
@@ -2398,7 +2338,7 @@ const MainApp = () => {
               }} className={`flex flex-col items-center gap-1 relative transition-colors active:scale-95 ${activeTab === 'chats' ? 'text-orange-500' : 'text-zinc-600'}`}>
               <MessageCircle size={22}/>
               <span className="text-[9px] font-black uppercase">Чаты</span>
-              {matchNotificationVisible && <div className="absolute top-0 right-1 w-2 h-2 bg-orange-600 rounded-full border-2 border-[#1c1c1e]" />}
+              {hasNewMatchNotification && <div className="absolute top-0 right-1 w-2 h-2 bg-orange-600 rounded-full border-2 border-[#1c1c1e]" />}
           </button>
           <button onClick={() => {
                 setActiveTab('profile'); 
