@@ -8,8 +8,26 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 
-// Fix Leaflet icons - Orange Theme
+// Fix Leaflet icons - Custom Theme
 delete L.Icon.Default.prototype._getIconUrl;
+
+// Создаем кастомные иконки
+const createCustomIcon = (color) => {
+  return L.divIcon({
+    html: `<div style="background-color: ${color}; width: 25px; height: 41px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    className: 'custom-marker',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+};
+
+// Иконки для разных типов
+const userIcon = createCustomIcon('#ea580c'); // Оранжевый для текущего пользователя
+const maleIcon = createCustomIcon('#3b82f6'); // Голубой для мужчин
+const femaleIcon = createCustomIcon('#ec4899'); // Розовый для женщин
+
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
@@ -851,8 +869,12 @@ const MainApp = () => {
       {!selectedChat && !viewingProfile && (
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
           <div className="text-lg font-black tracking-tighter italic uppercase">Мото<span className="text-orange-500">Знакомства</span></div>
-          <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
-            <User size={20} className={activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-400'} />
+          <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center overflow-hidden ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
+            {userData.image ? (
+              <img src={userData.image} className="w-full h-full object-cover" alt="Profile" />
+            ) : (
+              <User size={20} className={activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-400'} />
+            )}
           </button>
         </header>
       )}
@@ -1039,10 +1061,13 @@ const MainApp = () => {
                     attribution=""
                   />
                   {/* User Marker */}
-                   <Marker position={userLocation ? [userLocation.lat, userLocation.lng] : [
-                    cities.find(c => c.name === userData.city)?.lat || 55.7558, 
-                    cities.find(c => c.name === userData.city)?.lng || 37.6173
-                   ]}>
+                   <Marker 
+                     position={userLocation ? [userLocation.lat, userLocation.lng] : [
+                       cities.find(c => c.name === userData.city)?.lat || 55.7558, 
+                       cities.find(c => c.name === userData.city)?.lng || 37.6173
+                     ]} 
+                     icon={userIcon}
+                   >
                       <Popup className="custom-popup">
                          <div className="text-black font-bold">Вы здесь</div>
                       </Popup>
@@ -1056,8 +1081,11 @@ const MainApp = () => {
                       const latOffset = ((seed % 100) / 100 - 0.5) * 0.1;
                       const lngOffset = ((seed % 50) / 50 - 0.5) * 0.1;
                       
+                      // Определяем иконку по полу
+                      const icon = b.gender === 'female' ? femaleIcon : maleIcon;
+                      
                       return (
-                        <Marker key={b.id} position={[cityCoords.lat + latOffset, cityCoords.lng + lngOffset]}>
+                        <Marker key={b.id} position={[cityCoords.lat + latOffset, cityCoords.lng + lngOffset]} icon={icon}>
                           <Popup className="custom-popup">
                             <div className="w-48 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10 flex flex-col">
                                <div className="h-32 w-full relative shrink-0">

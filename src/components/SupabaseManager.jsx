@@ -162,7 +162,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             .from('messages')
             .select('*')
             .eq('chat_id', chat.id)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false });
           
           console.log(`Loaded ${messages?.length || 0} messages for chat ${chat.id}:`, messages?.map(m => ({id: m.id, sender: m.sender_id, is_read: m.is_read, text: m.text?.substring(0, 30)})));
           
@@ -179,9 +179,9 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
             image: partner?.image || null,
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
-            lastMessage: messages?.[messages.length - 1]?.text || 'Начните общение',
-            time: messages?.[messages.length - 1]?.created_at ? 
-              new Date(messages[messages.length - 1].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
+            lastMessage: messages?.[0]?.text || 'Начните общение',
+            time: messages?.[0]?.created_at ? 
+              new Date(messages[0].created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) :
               '',
             unreadCount: messages?.filter(m => {
               const isUnread = m.sender_id !== userId && !m.is_read;
@@ -258,6 +258,16 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         (payload) => {
           console.log('Message update:', payload);
           loadChats();
+          
+          // Отправляем уведомление для новых сообщений от других пользователей
+          if (payload.eventType === 'INSERT' && payload.new.sender_id !== userId) {
+            const chatName = payload.new.chat_id; // Здесь можно получить имя чата
+            window.supabaseManager.sendNotification(
+              'Новое сообщение',
+              `У вас новое сообщение в чате`,
+              '/favicons/android-chrome-192x192.png'
+            );
+          }
         }
       )
       .subscribe();
@@ -295,8 +305,46 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     };
   }, []);
 
+  // Realtime подписка для пользователей
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const subscription = supabase
+      .channel('users')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'users',
+          filter: `id=neq.${userId}`
+        }, 
+        (payload) => {
+          console.log('User updated:', payload);
+          loadUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Экспортируем функции для использования в MainApp
   window.supabaseManager = {
+    // Функция для отправки push уведомлений
+    sendNotification: (title, body, icon = '/favicons/android-chrome-192x192.png') => {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: icon,
+          badge: '/favicons/favicon-32x32.png',
+          vibrate: [100, 50, 100],
+          tag: 'motopara-notification'
+        });
+      }
+    },
     sendMessage: async (chatId, text, type = 'text', imageUrl = null) => {
       const userId = localStorage.getItem('userId');
       const { data, error } = await supabase
