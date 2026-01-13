@@ -168,21 +168,51 @@ const MainApp = () => {
 
   // Запрос разрешения на уведомления
   const requestNotificationPermission = async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          console.log('Разрешение на уведомления получено');
-          // Регистрируем Service Worker для push уведомлений
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-          }
-          // Подписываемся на push уведомления
-          await subscribeToPushNotifications();
-        }
-      } catch (error) {
-        console.error('Ошибка запроса разрешения на уведомления:', error);
+    // Проверяем поддержку уведомлений
+    if (!('Notification' in window)) {
+      console.log('Браузер не поддерживает уведомления');
+      return;
+    }
+
+    console.log('Текущий статус разрешений:', Notification.permission);
+
+    try {
+      let permission;
+      
+      // Если разрешение еще не запрашивалось, запрашиваем
+      if (Notification.permission === 'default') {
+        permission = await Notification.requestPermission();
+        console.log('Получено разрешение:', permission);
+      } else {
+        permission = Notification.permission;
+        console.log('Используем существующее разрешение:', permission);
       }
+
+      // Если разрешение получено, регистрируем Service Worker и подписываемся
+      if (permission === 'granted') {
+        console.log('Разрешение на уведомления получено');
+        
+        // Регистрируем Service Worker для push уведомлений
+        if ('serviceWorker' in navigator) {
+          try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('Service Worker зарегистрирован:', registration);
+          } catch (error) {
+            console.error('Ошибка регистрации Service Worker:', error);
+          }
+        }
+        
+        // Подписываемся на push уведомления
+        await subscribeToPushNotifications();
+      } else if (permission === 'denied') {
+        console.log('Пользователь запретил уведомления');
+        // Можно показать информационное сообщение о важности уведомлений
+      } else if (permission === 'granted') {
+        // Если разрешение уже было получено ранее, все равно подписываемся
+        await subscribeToPushNotifications();
+      }
+    } catch (error) {
+      console.error('Ошибка запроса разрешения на уведомления:', error);
     }
   };
 
@@ -237,31 +267,62 @@ const MainApp = () => {
 
   // Подписка на push уведомления
   const subscribeToPushNotifications = async () => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array('BJjpNkIbnYXoftgL755_wE_IeooVx-pN-Pl_nZM7UpQ_TpUl1tNACNdPBr3q5MqzfdFxoLcW8aIQq8TE8a_ddbE')
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Браузер не поддерживает push уведомления');
+      return;
+    }
+
+    // Получаем userId из localStorage, если userData еще не загружен
+    const userId = userData?.id || localStorage.getItem('userId');
+    
+    if (!userId) {
+      console.error('Не найден ID пользователя для подписки на push уведомления');
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      console.log('Service Worker готов, подписываемся на push уведомления...');
+      
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array('BJjpNkIbnYXoftgL755_wE_IeooVx-pN-Pl_nZM7UpQ_TpUl1tNACNdPBr3q5MqzfdFxoLcW8aIQq8TE8a_ddbE')
+      });
+
+      console.log('Подписка получена:', subscription);
+
+      // Сохраняем подписку в базу данных
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          user_id: userId,
+          endpoint: subscription.endpoint,
+          p256dh_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh')))),
+          auth_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))))
         });
 
-        // Сохраняем подписку в базу данных
-        const { error } = await supabase
-          .from('push_subscriptions')
-          .upsert({
-            user_id: userData?.id,
-            endpoint: subscription.endpoint,
-            p256dh_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh')))),
-            auth_key: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth'))))
-          });
-
-        if (error) {
-          console.error('Ошибка сохранения подписки:', error);
-        } else {
-          console.log('Подписка на push уведомления успешно сохранена');
+      if (error) {
+        console.error('Ошибка сохранения подписки:', error);
+      } else {
+        console.log('Подписка на push уведомления успешно сохранена');
+      }
+    } catch (error) {
+      console.error('Ошибка подписки на push уведомления:', error);
+      // Если пользователь ранее отменил подписку, пытаемся создать новую
+      if (error.name === 'AbortError' || error.message.includes('subscription')) {
+        console.log('Пробуем создать новую подписку...');
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          // Сначала удаляем старую подписку если есть
+          const existingSubscription = await registration.pushManager.getSubscription();
+          if (existingSubscription) {
+            await existingSubscription.unsubscribe();
+          }
+          // Создаем новую подписку
+          await subscribeToPushNotifications();
+        } catch (retryError) {
+          console.error('Повторная попытка подписки не удалась:', retryError);
         }
-      } catch (error) {
-        console.error('Ошибка подписки на push уведомления:', error);
       }
     }
   };
@@ -462,6 +523,12 @@ const MainApp = () => {
                     if (user.images && Array.isArray(user.images)) {
                         setUserImages(user.images);
                         localStorage.setItem('userImages', JSON.stringify(user.images));
+                    }
+                    
+                    // Повторно пытаемся подписаться на push уведомления после загрузки userData
+                    if (Notification.permission === 'granted') {
+                      console.log('Повторная попытка подписки на push уведомления после загрузки профиля');
+                      await subscribeToPushNotifications();
                     }
                     
                     // Проверяем, новый ли это пользователь (пустой профиль)
