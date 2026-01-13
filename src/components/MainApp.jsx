@@ -172,7 +172,7 @@ L.Icon.Default.mergeOptions({
 
 const MainApp = () => {
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
-  const [isSplashing, setIsSplashing] = useState(() => !localStorage.getItem('userId'));
+  const [isSplashing, setIsSplashing] = useState(true); // Всегда начинаем со сплэшскрина
   const [isNewUser, setIsNewUser] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -318,16 +318,43 @@ const MainApp = () => {
   useEffect(() => {
           const checkSession = async () => {
               const { data: { session } } = await supabase.auth.getSession();
+              
               if (session) {
-                  setIsSplashing(false);
                   localStorage.setItem('userId', session.user.id);
                   
                   // Load fresh profile data
-                  const { data: user } = await supabase
+                  let { data: user } = await supabase
                     .from('users')
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
+                  
+                  // Если профиля нет, создаем его с пустыми полями
+                  if (!user) {
+                     const defaultProfile = {
+                       id: session.user.id,
+                       email: session.user.email,
+                       name: null, // Пустое по умолчанию
+                       age: null, // Пустое по умолчанию
+                       city: session.user.user_metadata?.city || "Москва",
+                       bike: "",
+                       gender: session.user.user_metadata?.gender || "male",
+                       has_bike: false,
+                       about: null,
+                       image: null,
+                       has_seen_welcome: false,
+                       created_at: new Date().toISOString()
+                     };
+                     
+                     const { data: newProfile, error } = await supabase
+                       .from('users')
+                       .insert([defaultProfile])
+                       .select()
+                       .single();
+                       
+                     if (!error) user = newProfile;
+                     else console.error('Error creating profile:', error);
+                  }
                     
                   if (user) {
                     setUserData(user);
@@ -351,6 +378,12 @@ const MainApp = () => {
                         .eq('id', user.id);
                     }
                   }
+                  
+                  // Для залогиненных пользователей сразу убираем сплэшскрин
+                  setIsSplashing(false);
+              } else {
+                // Если нет сессии, все равно убираем сплэшскрин через секунду
+                setTimeout(() => setIsSplashing(false), 1000);
               }
           };
           checkSession();
@@ -490,65 +523,6 @@ const MainApp = () => {
     };
   }, [selectedChat?.id]);
 
-  // Загрузка профиля пользователя из Supabase
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id || localStorage.getItem('userId');
-        
-        if (userId) {
-          let { data: profile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-
-          if (!profile) {
-             // Создаем профиль
-             const defaultProfile = {
-               id: userId,
-               email: user?.email,
-               name: user?.user_metadata?.full_name || "Новый Байкер",
-               age: 25,
-               city: user?.user_metadata?.city || "Москва",
-               bike: "",
-               gender: user?.user_metadata?.gender || "male",
-               has_bike: false,
-               about: "Привет! Я здесь новенький.",
-               image: null,
-               created_at: new Date().toISOString()
-             };
-             
-             const { data: newProfile, error } = await supabase
-               .from('users')
-               .insert([defaultProfile])
-               .select()
-               .single();
-               
-             if (!error) profile = newProfile;
-             else console.error('Error creating profile:', error);
-          }
-          
-          if (profile) {
-            setUserData(profile);
-            localStorage.setItem('userId', userId);
-          } else {
-             // Fallback if profile creation failed
-             console.error('Could not load or create profile');
-             setError('Не удалось загрузить профиль. Попробуйте обновить страницу.');
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching user profile:', err);
-      } finally {
-        setTimeout(() => setIsSplashing(false), 1000);
-      }
-    };
-
-    fetchUserProfile();
-  }, []);
-  
   // Обновление индекса при изменении фильтров
   useEffect(() => {
     setCurrentIndex(0);
