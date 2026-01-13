@@ -321,7 +321,7 @@ const MainApp = () => {
                      const defaultProfile = {
                        id: session.user.id,
                        email: session.user.email,
-                       name: null, // Пустое по умолчанию
+                       name: session.user.user_metadata?.full_name || null, // Берем имя из метаданных регистрации
                        age: null, // Пустое по умолчанию
                        city: session.user.user_metadata?.city || "Москва",
                        bike: "",
@@ -650,6 +650,10 @@ const MainApp = () => {
 
   const switchImage = (e) => {
     if (!currentBiker) return;
+    
+    // Если у пользователя нет изображений, не переключаем
+    if (!currentBiker.images || currentBiker.images.length === 0) return;
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     if (x > rect.width / 2) {
@@ -661,6 +665,8 @@ const MainApp = () => {
     } else {
       if (currentImageIndex > 0) {
         setCurrentImageIndex(prev => prev - 1);
+      } else {
+        setCurrentImageIndex(currentBiker.images.length - 1);
       }
     }
   };
@@ -1119,16 +1125,19 @@ const MainApp = () => {
                       onClick={switchImage}
                     >
                       <img 
-                        src={currentBiker.images[currentImageIndex] || currentBiker.images[0]} 
+                        src={currentBiker.images[currentImageIndex] || currentBiker.images[0] || DEFAULT_AVATAR} 
                         className="absolute inset-0 w-full h-full object-cover z-10" 
                         alt="Biker" 
+                        onError={(e) => {
+                          e.target.src = DEFAULT_AVATAR;
+                        }}
                       />
 
                       {/* Полоски индикатора изображений */}
                       <div className="absolute top-6 left-6 right-6 flex gap-1.5 z-30 pointer-events-none">
-                        {currentBiker.images.map((_, i) => (
+                        {currentBiker.images && currentBiker.images.length > 0 ? currentBiker.images.map((_, i) => (
                           <div key={i} className={`h-1 flex-1 rounded-full transition-all backdrop-blur-sm ${i === currentImageIndex ? 'bg-orange-500' : 'bg-white/30'}`} />
-                        ))}
+                        )) : null}
                       </div>
 
                       {/* Затемнение внизу для читаемости */}
