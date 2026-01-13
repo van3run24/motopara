@@ -498,6 +498,7 @@ const MainApp = () => {
   const typingTimeoutRef = useRef(null);
   const [contextMenuMessageId, setContextMenuMessageId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const messagesEndRef = useRef(null);
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -901,23 +902,36 @@ const MainApp = () => {
     if (!e.target.files || e.target.files.length === 0) return;
 
     try {
-        setIsUploading(true); // Начинаем загрузку
+        setIsUploading(true);
         const userId = localStorage.getItem('userId');
         
-        if (isProfile && userId) {
+        if (!userId) {
+            throw new Error('Пользователь не найден');
+        }
+        
+        if (isProfile) {
             const file = e.target.files[0];
+            console.log('Uploading avatar:', file.name);
             const imageUrl = await userService.uploadAvatar(userId, file);
-            await supabase.from('users').update({ image: imageUrl }).eq('id', userId);
-            setUserData({...userData, image: imageUrl});
-            // Добавляем аватар также в галерею
+            console.log('Avatar uploaded:', imageUrl);
+            
+            // Обновляем состояние аватара
+            setUserData(prev => ({...prev, image: imageUrl}));
+            
+            // Добавляем аватар в галерею
             if (!userImages.includes(imageUrl)) {
                 await updateGallery([imageUrl, ...userImages]);
             }
-        } else if (isGallery && userId) {
+            
+        } else if (isGallery) {
             const file = e.target.files[0];
+            console.log('Uploading gallery image:', file.name);
             const imageUrl = await userService.uploadGalleryImage(userId, file);
+            console.log('Gallery image uploaded:', imageUrl);
+            
+            // Добавляем фото в галерею
             await updateGallery([...userImages, imageUrl]);
-            // НЕ меняем аватар при добавлении в галерею
+            
         } else {
             // Chat images (support multiple)
             const files = Array.from(e.target.files);
@@ -942,7 +956,9 @@ const MainApp = () => {
         }
     } catch (err) {
         console.error('Error uploading image:', err);
-        setError('Ошибка загрузки фото');
+        setError('Ошибка загрузки фото: ' + err.message);
+        // Показываем alert для лучшей обратной связи
+        alert('Ошибка загрузки фото: ' + err.message);
     } finally {
         setIsUploading(false); // Завершаем загрузку в любом случае
     }
@@ -2133,24 +2149,35 @@ const MainApp = () => {
 
               <button onClick={async () => {
                  try {
-                   setIsUploading(true); // Показываем загрузку
+                   setIsLoggingOut(true);
                    await supabase.auth.signOut();
                    localStorage.removeItem('userId');
                    localStorage.removeItem('userImages');
                    localStorage.removeItem('supabase.auth.token');
                    localStorage.removeItem('supabase.auth.refreshToken');
-                   // Полная очистка и перезагрузка
+                   
+                   // Более надежный выход для всех устройств
                    setTimeout(() => {
-                     window.location.href = window.location.origin + '?logout=' + Date.now();
+                     window.location.reload();
                    }, 100);
                  } catch (error) {
                    console.error('Error signing out:', error);
-                   setIsUploading(false);
-                   // В случае ошибки все равно пробуем обновить
-                   window.location.href = window.location.origin + '?logout=' + Date.now();
+                   setIsLoggingOut(false);
+                   setTimeout(() => {
+                     window.location.reload();
+                   }, 100);
                  }
                }} className="w-full bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
-                 <div className="flex items-center gap-4 text-red-500"><LogOut size={20}/><span className="font-bold uppercase tracking-tighter text-sm text-white">Выйти</span></div>
+                 <div className="flex items-center gap-4 text-red-500">
+                   {isLoggingOut ? (
+                     <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                   ) : (
+                     <LogOut size={20}/>
+                   )}
+                   <span className="font-bold uppercase tracking-tighter text-sm text-white">
+                     {isLoggingOut ? 'Выход...' : 'Выйти'}
+                   </span>
+                 </div>
               </button>
             </div>
             </>
