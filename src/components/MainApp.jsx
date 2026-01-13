@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Plus, Calendar, Clock, Smile, Database, Loader2, Check, CheckCheck, Info } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
