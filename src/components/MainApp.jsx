@@ -513,7 +513,6 @@ const MainApp = () => {
   const [bikers, setBikers] = useState([]);
   const [chats, setChats] = useState([]);
   const [newMatches, setNewMatches] = useState([]);
-  const [likedUsers, setLikedUsers] = useState(new Set()); // Отслеживаем лайкнутых пользователей
 
   const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
   const fileInputRef = useRef(null);
@@ -549,10 +548,9 @@ const MainApp = () => {
     return bikers.filter(b => 
       !matchedIds.includes(b.id) && 
       b.id !== currentUserId &&
-      b.city === userData?.city &&
-      !likedUsers.has(b.id) // Исключаем лайкнутых пользователей
+      b.city === userData?.city
     );
-  }, [bikers, matchedIds, userData?.city, likedUsers]);
+  }, [bikers, matchedIds, userData?.city]);
 
   // Безопасное получение currentBiker с проверкой на существование
   const currentBiker = filteredBikers.length > 0 && currentIndex >= 0 && currentIndex < filteredBikers.length 
@@ -647,17 +645,12 @@ const MainApp = () => {
     
     setExitDirection('right');
     
-    // Добавляем пользователя в список лайкнутых
-    setLikedUsers(prev => new Set([...prev, likedUser.id]));
-    
     setTimeout(() => {
         setCurrentIndex((prev) => prev + 1);
         setCurrentImageIndex(0);
         setDragOffset({ x: 0, y: 0 });
         setExitDirection(null);
-        if (profileScrollRef.current) {
-            profileScrollRef.current.scrollTop = 0;
-        }
+        if (profileScrollRef.current) profileScrollRef.current.scrollTop = 0;
     }, 300);
 
     try {
@@ -666,20 +659,22 @@ const MainApp = () => {
         
         if (result.isMatch) {
           const newChat = result.chat;
-          setChats(prevChats => [newChat, ...prevChats]);
-          
-          // Добавляем в новые мэтчи
-          setNewMatches(prev => [{
+          const chatData = {
             id: newChat.id,
             name: likedUser.name,
-            image: likedUser.images?.[0] || likedUser.image,
-            isNew: true
-          }, ...prev]);
+            image: likedUser.images[0] || DEFAULT_AVATAR,
+            lastMessage: 'Новый мэтч!',
+            time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+            online: true,
+            unreadCount: 1,
+            messages: [],
+            partnerId: likedUser.id
+          };
+          setChats(prev => [...prev, chatData]);
           
-          // Показываем модальное окно мэтча
-          setMatchData({
-            user: likedUser,
-            chat: newChat
+          setMatchData(likedUser);
+          setHasNewMatchNotification(true);
+          setNewMatches(prev => [{...likedUser, isNew: true}, ...prev]);
           
           // Отправляем уведомление о новом мэтче
           sendNotification('🏍️ Новый мэтч!', {
@@ -698,6 +693,29 @@ const MainApp = () => {
       }
     } catch (err) {
       console.error('Error in handleLike:', err);
+    }
+  };
+
+  const handleDislike = async () => {
+    if (!currentBiker) return;
+    const dislikedUser = currentBiker;
+    
+    setExitDirection('left');
+    
+    setTimeout(() => {
+        setCurrentIndex((prev) => prev + 1);
+        setCurrentImageIndex(0);
+        setDragOffset({ x: 0, y: 0 });
+        setExitDirection(null);
+        if (profileScrollRef.current) profileScrollRef.current.scrollTop = 0;
+    }, 300);
+
+    try {
+      if (window.supabaseManager && dislikedUser.id) {
+        await window.supabaseManager.recordDislike(dislikedUser.id);
+      }
+    } catch (err) {
+      console.error('Error in handleDislike:', err);
     }
   };
 
@@ -731,8 +749,8 @@ const MainApp = () => {
         // Свайп вправо - лайк
         handleLike();
       } else {
-        // Свайп влево - пропуск
-        handleNext();
+        // Свайп влево - дизлайк
+        handleDislike();
       }
     }
     
@@ -766,7 +784,7 @@ const MainApp = () => {
       if (dragOffset.x > 0) {
         handleLike();
       } else {
-        handleNext();
+        handleDislike();
       }
     }
     
@@ -1333,7 +1351,7 @@ const MainApp = () => {
                 {/* Панель действий под окошком */}
                 <div className="w-full max-w-md flex items-center justify-center gap-10 shrink-0 py-1">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); handleNext(); }} 
+                    onClick={(e) => { e.stopPropagation(); handleDislike(); }} 
                     className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center active:scale-90 shadow-lg hover:bg-white/20 transition-all relative z-50"
                   >
                     <X size={28} className="text-white/90" />

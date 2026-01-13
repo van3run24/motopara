@@ -4,13 +4,53 @@ ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- Enable Realtime for tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.likes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+-- Enable Realtime for tables (with checks to avoid duplicates)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'messages'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'chats'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'users'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'likes'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.likes;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'events'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'push_subscriptions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.push_subscriptions;
+    END IF;
+END $$;
 
 -- Add is_read column to messages table if it doesn't exist
 DO $$
@@ -70,6 +110,7 @@ CREATE OR REPLACE FUNCTION mark_messages_read(p_chat_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   UPDATE public.messages
@@ -130,3 +171,30 @@ FOR INSERT WITH CHECK (auth.uid() = created_by_id);
 DROP POLICY IF EXISTS "Users can delete own events" ON public.events;
 CREATE POLICY "Users can delete own events" ON public.events
 FOR DELETE USING (auth.uid() = created_by_id);
+
+-- PUSH SUBSCRIPTIONS POLICIES
+DROP POLICY IF EXISTS "Users can manage own push subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Users can manage own push subscriptions" ON public.push_subscriptions
+FOR ALL USING (auth.uid() = user_id);
+
+-- Secure function for push notification service
+CREATE OR REPLACE FUNCTION get_push_subscription_for_notification(p_user_id UUID)
+RETURNS TABLE (
+  endpoint TEXT,
+  p256dh_key TEXT,
+  user_id UUID
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    ps.endpoint,
+    ps.p256dh_key,
+    ps.user_id
+  FROM public.push_subscriptions ps
+  WHERE ps.user_id = p_user_id;
+END;
+$$;

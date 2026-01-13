@@ -614,6 +614,26 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       
       return { isMatch: false };
     },
+
+    recordDislike: async (targetUserId) => {
+      const userId = localStorage.getItem('userId');
+      
+      // Записываем дизлайк в ту же таблицу likes с отрицательным значением или в отдельную таблицу
+      // Для простоты используем ту же таблицу, но с флагом
+      const { error: dislikeError } = await supabase
+        .from('likes')
+        .insert([{ 
+          from_user_id: userId, 
+          to_user_id: targetUserId,
+          is_dislike: true 
+        }]);
+      
+      if (dislikeError && dislikeError.code !== '23505') { // Игнорируем дубликаты
+         console.error('Error recording dislike:', dislikeError);
+      }
+      
+      return { success: true };
+    },
     createChat: async (participant1Id, participant2Id) => {
       const { data, error } = await supabase
         .from('chats')

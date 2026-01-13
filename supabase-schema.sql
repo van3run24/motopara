@@ -90,7 +90,7 @@ CREATE POLICY "Users can view all profiles" ON users
   FOR SELECT USING (true);
 
 CREATE POLICY "Users can insert own profile" ON users
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (auth.uid()::text = id::text);
 
 CREATE POLICY "Users can update own profile" ON users
   FOR UPDATE USING (auth.uid()::text = id::text);
