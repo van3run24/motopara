@@ -870,7 +870,7 @@ const MainApp = () => {
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
           <div className="text-lg font-black tracking-tighter italic uppercase">Мото<span className="text-orange-500">Знакомства</span></div>
           <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center overflow-hidden ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
-            {userData.image ? (
+            {userData?.image ? (
               <img src={userData.image} className="w-full h-full object-cover" alt="Profile" />
             ) : (
               <User size={20} className={activeTab === 'profile' ? 'text-orange-500' : 'text-zinc-400'} />
@@ -1547,7 +1547,7 @@ const MainApp = () => {
                 className="w-32 h-32 rounded-[44px] bg-gradient-to-tr from-orange-600 to-yellow-500 p-1 cursor-pointer hover:opacity-90 transition-opacity active:scale-95"
               >
                 <div className="w-full h-full rounded-[42px] bg-zinc-900 flex items-center justify-center overflow-hidden border-4 border-black">
-                  {userData.image ? (
+                  {userData?.image ? (
                     <img src={userData.image} className="w-full h-full object-cover" alt="Profile" />
                   ) : (
                     <User size={60} className="text-zinc-800" />
@@ -1639,7 +1639,7 @@ const MainApp = () => {
                   />
                   <div className="flex items-center gap-4">
                     <div className="w-20 h-20 rounded-2xl overflow-hidden border border-white/10">
-                      {userData.image ? (
+                      {userData?.image ? (
                         <img src={userData.image} className="w-full h-full object-cover" alt="Profile" />
                       ) : (
                         <div className="w-full h-full bg-white/5 flex items-center justify-center">
@@ -1657,12 +1657,12 @@ const MainApp = () => {
                 </div>
                 
                 {/* ГАЛЕРЕЯ ФОТО */}
-                {(userImages.length > 0 || userData.image) && (
+                {(userImages.length > 0 || userData?.image) && (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-zinc-600 uppercase">Галерея фото</label>
                     <div className="grid grid-cols-3 gap-3 mb-3">
                       {userImages.map((img, idx) => {
-                        const isMainPhoto = userData.image === img;
+                        const isMainPhoto = userData?.image === img;
                         return (
                           <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-white/10 relative group">
                             <img src={img} className="w-full h-full object-cover" alt={`Photo ${idx + 1}`} />
