@@ -1571,15 +1571,15 @@ const MainApp = () => {
                 
                 const msg = item;
                 return (
-                    <div 
-                        key={msg.id || idx} 
-                        className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
-                        onClick={() => {
-                            if (msg.sender === 'me') {
-                                setContextMenuMessageId(contextMenuMessageId === msg.id ? null : msg.id);
-                            }
-                        }}
-                    >
+                  <div 
+                      key={msg.id || idx} 
+                      className={`max-w-[85%] relative group ${msg.sender === 'me' ? 'self-end' : 'self-start'}`}
+                      onClick={() => {
+                          if (msg.sender === 'me') {
+                              setContextMenuMessageId(contextMenuMessageId === msg.id ? null : msg.id);
+                          }
+                      }}
+                  >
                       {/* Context Menu for Edit/Delete */}
                       {contextMenuMessageId === msg.id && msg.sender === 'me' && (
                           <div className="absolute bottom-full right-0 mb-2 bg-[#1c1c1e] border border-white/10 rounded-xl p-2 shadow-2xl z-50 flex flex-col gap-1 min-w-[120px] animate-in fade-in zoom-in-95 duration-200">
@@ -1626,9 +1626,9 @@ const MainApp = () => {
                         </div>
                       )}
                     </div>
-                      );
-                    }
-                })
+                  );
+                }
+              )}
               )}
               <div ref={messagesEndRef} />
                 </>
