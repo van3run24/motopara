@@ -172,7 +172,8 @@ L.Icon.Default.mergeOptions({
 
 const MainApp = () => {
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
-  const [isSplashing, setIsSplashing] = useState(true); // Всегда начинаем со сплэшскрина
+  const [isSplashing, setIsSplashing] = useState(false); // Не показываем сплэшскрин по умолчанию
+  const [isLoading, setIsLoading] = useState(true); // Показываем загрузку пока данные не загружены
   const [isNewUser, setIsNewUser] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -317,6 +318,7 @@ const MainApp = () => {
 
   useEffect(() => {
           const checkSession = async () => {
+              setIsLoading(true);
               const { data: { session } } = await supabase.auth.getSession();
               
               if (session) {
@@ -378,13 +380,8 @@ const MainApp = () => {
                         .eq('id', user.id);
                     }
                   }
-                  
-                  // Для залогиненных пользователей сразу убираем сплэшскрин
-                  setIsSplashing(false);
-              } else {
-                // Если нет сессии, все равно убираем сплэшскрин через секунду
-                setTimeout(() => setIsSplashing(false), 1000);
               }
+              setIsLoading(false);
           };
           checkSession();
         }, []);
@@ -1034,17 +1031,12 @@ const MainApp = () => {
   }, [chats]);
 
 
-  if (isSplashing) {
+  // Показываем загрузку пока данные не загружены
+  if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black z-[1000] flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center animate-in fade-in duration-1000">
-            <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white mb-4">
-                МОТО<span className="text-orange-500">ЗНАКОМСТВА</span>
-            </h1>
-            <div className="w-32 h-0.5 bg-zinc-800 rounded-full relative overflow-hidden">
-                <div className="absolute inset-0 bg-orange-600 animate-out slide-out-to-right duration-[2000ms] ease-in-out" />
-            </div>
-        </div>
+      <div className="fixed inset-0 bg-black text-white flex flex-col items-center justify-center">
+        <div className="w-16 h-16 border-4 border-zinc-800 border-t-orange-600 rounded-full animate-spin"></div>
+        <p className="mt-4 text-zinc-400">Загрузка...</p>
       </div>
     );
   }
