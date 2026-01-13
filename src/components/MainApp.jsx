@@ -1332,18 +1332,23 @@ const MainApp = () => {
                       {event.address && (
                         <button 
                           onClick={() => {
-                            // Используем Яндекс Навигатор для построения маршрута
-                            const yandexNavigatorUrl = `https://yandex.ru/navi/?route=${encodeURIComponent(event.address)}`;
-                            // Fallback на Яндекс Карты, если Навигатор не установлен
-                            const yandexMapsUrl = `https://yandex.ru/maps/?whatshere[point]=${encodeURIComponent(event.address)}&whatshere[zoom]=17`;
-                            
-                            // Сначала пробуем открыть Навигатор, потом Карты
-                            window.open(yandexNavigatorUrl, '_blank');
-                            setTimeout(() => {
-                              window.open(yandexMapsUrl, '_blank');
-                            }, 100);
-                          }}
-                          className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
+                            // Получаем текущее местоположение пользователя
+                            navigator.geolocation.getCurrentPosition(
+                              (position) => {
+                                const lat = position.coords.latitude;
+                                const lng = position.coords.longitude;
+                                // Строим маршрут от текущего местоположения до адреса события
+                                const yandexNavigatorUrl = `https://yandex.ru/navi/?ll=${lng},${lat}&rtm=auto&rtext=${encodeURIComponent(event.address)}`;
+                                window.open(yandexNavigatorUrl, '_blank');
+                              },
+                              (error) => {
+                                console.log('Could not get location, using fallback');
+                                // Запасной вариант - строим маршрут по адресу
+                                const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(event.address)}&rtm=auto`;
+                                window.open(yandexMapsUrl, '_blank');
+                              }
+                            );
+                          }}className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
                           <MapPin size={14} className="shrink-0" />
                           <span className="truncate">{event.address}</span>
