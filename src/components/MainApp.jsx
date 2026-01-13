@@ -866,15 +866,22 @@ const MainApp = () => {
   const updateGallery = async (newImages) => {
     try {
         const userId = localStorage.getItem('userId');
+        console.log('Updating gallery with images:', newImages);
+        
         const { error } = await supabase
             .from('users')
             .update({ images: newImages }) 
             .eq('id', userId);
         
-        if (error) throw error;
+        if (error) {
+            console.error('Gallery update error:', error);
+            throw error;
+        }
+        
         setUserImages(newImages);
         localStorage.setItem('userImages', JSON.stringify(newImages));
         setUserData(prev => ({ ...prev, images: newImages }));
+        console.log('Gallery updated successfully');
     } catch (err) {
         console.error('Error updating gallery:', err);
         alert('Не удалось обновить галерею. Попробуйте еще раз.');
@@ -912,25 +919,40 @@ const MainApp = () => {
         if (isProfile) {
             const file = e.target.files[0];
             console.log('Uploading avatar:', file.name);
-            const imageUrl = await userService.uploadAvatar(userId, file);
-            console.log('Avatar uploaded:', imageUrl);
             
-            // Обновляем состояние аватара
-            setUserData(prev => ({...prev, image: imageUrl}));
-            
-            // Добавляем аватар в галерею
-            if (!userImages.includes(imageUrl)) {
-                await updateGallery([imageUrl, ...userImages]);
+            try {
+                const imageUrl = await userService.uploadAvatar(userId, file);
+                console.log('Avatar uploaded:', imageUrl);
+                
+                // Обновляем состояние аватара
+                setUserData(prev => ({...prev, image: imageUrl}));
+                
+                // Добавляем аватар в галерею с задержкой
+                setTimeout(async () => {
+                    if (!userImages.includes(imageUrl)) {
+                        console.log('Adding avatar to gallery:', imageUrl);
+                        await updateGallery([imageUrl, ...userImages]);
+                    }
+                }, 500);
+            } catch (uploadError) {
+                console.error('Avatar upload error:', uploadError);
+                throw uploadError;
             }
             
         } else if (isGallery) {
             const file = e.target.files[0];
             console.log('Uploading gallery image:', file.name);
-            const imageUrl = await userService.uploadGalleryImage(userId, file);
-            console.log('Gallery image uploaded:', imageUrl);
             
-            // Добавляем фото в галерею
-            await updateGallery([...userImages, imageUrl]);
+            try {
+                const imageUrl = await userService.uploadGalleryImage(userId, file);
+                console.log('Gallery image uploaded:', imageUrl);
+                
+                // Добавляем фото в галерею
+                await updateGallery([...userImages, imageUrl]);
+            } catch (uploadError) {
+                console.error('Gallery upload error:', uploadError);
+                throw uploadError;
+            }
             
         } else {
             // Chat images (support multiple)
@@ -2151,21 +2173,34 @@ const MainApp = () => {
                  try {
                    setIsLoggingOut(true);
                    await supabase.auth.signOut();
-                   localStorage.removeItem('userId');
-                   localStorage.removeItem('userImages');
-                   localStorage.removeItem('supabase.auth.token');
-                   localStorage.removeItem('supabase.auth.refreshToken');
                    
-                   // Более надежный выход для всех устройств
+                   // Полная очистка всех данных
+                   localStorage.clear();
+                   sessionStorage.clear();
+                   
+                   // Дополнительная очистка Supabase
+                   const { error } = await supabase.auth.signOut({ scope: 'global' });
+                   if (error) {
+                     console.error('Global signout error:', error);
+                   }
+                   
+                   // Принудительная перезагрузка с очисткой кэша
                    setTimeout(() => {
-                     window.location.reload();
-                   }, 100);
+                     if ('caches' in window) {
+                       caches.keys().then(names => {
+                         names.forEach(name => {
+                           caches.delete(name);
+                         });
+                       });
+                     }
+                     window.location.href = window.location.origin + '?logout=true&t=' + Date.now();
+                   }, 200);
                  } catch (error) {
                    console.error('Error signing out:', error);
                    setIsLoggingOut(false);
                    setTimeout(() => {
-                     window.location.reload();
-                   }, 100);
+                     window.location.href = window.location.origin + '?logout=true&t=' + Date.now();
+                   }, 200);
                  }
                }} className="w-full bg-white/[0.02] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
                  <div className="flex items-center gap-4 text-red-500">
