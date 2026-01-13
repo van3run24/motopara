@@ -172,8 +172,7 @@ L.Icon.Default.mergeOptions({
 
 const MainApp = () => {
   // --- СОСТОЯНИЯ ПРИЛОЖЕНИЯ ---
-  const [isSplashing, setIsSplashing] = useState(false); // Не показываем сплэшскрин по умолчанию
-  const [isLoading, setIsLoading] = useState(true); // Показываем загрузку пока данные не загружены
+  const [isLoading, setIsLoading] = useState(false); // Не показываем загрузку
   const [isNewUser, setIsNewUser] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -318,7 +317,6 @@ const MainApp = () => {
 
   useEffect(() => {
           const checkSession = async () => {
-              setIsLoading(true);
               const { data: { session } } = await supabase.auth.getSession();
               
               if (session) {
@@ -381,7 +379,6 @@ const MainApp = () => {
                     }
                   }
               }
-              setIsLoading(false);
           };
           checkSession();
         }, []);
@@ -1031,16 +1028,6 @@ const MainApp = () => {
   }, [chats]);
 
 
-  // Показываем загрузку пока данные не загружены
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-black text-white flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-zinc-800 border-t-orange-600 rounded-full animate-spin"></div>
-        <p className="mt-4 text-zinc-400">Загрузка...</p>
-      </div>
-    );
-  }
-
   // Обработка ошибок
   if (error) {
     return (
@@ -1448,14 +1435,15 @@ const MainApp = () => {
                                 const lat = position.coords.latitude;
                                 const lng = position.coords.longitude;
                                 // Строим маршрут от текущего местоположения до адреса события
-                                const yandexNavigatorUrl = `https://yandex.ru/navi/?ll=${lng},${lat}&rtm=auto&rtext=${encodeURIComponent(event.address)}`;
+                                // Правильный формат для Яндекс Навигатора: откуда~куда
+                                const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${lat},${lng}~${encodeURIComponent(event.address)}`;
                                 window.open(yandexNavigatorUrl, '_blank');
                               },
                               (error) => {
                                 console.log('Could not get location, using fallback');
-                                // Запасной вариант - строим маршрут по адресу
-                                const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(event.address)}&rtm=auto`;
-                                window.open(yandexMapsUrl, '_blank');
+                                // Запасной вариант - строим маршрут по адресу (только конечная точка)
+                                const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
+                                window.open(yandexNavigatorUrl, '_blank');
                               }
                             );
                           }}className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
