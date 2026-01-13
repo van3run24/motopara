@@ -154,9 +154,14 @@ const MainApp = () => {
       
       if (data.response.GeoObjectCollection.featureMember.length > 0) {
         const coords = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos.split(' ');
+        const lng = parseFloat(coords[0]);
+        const lat = parseFloat(coords[1]);
+        
+        // Возвращаем в формате PostGIS POINT
         return {
-          lat: parseFloat(coords[1]),
-          lng: parseFloat(coords[0])
+          lat: lat,
+          lng: lng,
+          point: `POINT(${lng} ${lat})` // PostGIS формат
         };
       }
     } catch (error) {
@@ -168,10 +173,32 @@ const MainApp = () => {
 
   // Функция для добавления координат к событиям
   const eventsWithCoordinates = useMemo(() => {
-    return events.map(event => ({
-      ...event,
-      coordinates: event.coordinates || null // Будет заполняться при загрузке
-    }));
+    return events.map(event => {
+      // Если координаты есть в PostGIS формате, извлекаем lat/lng
+      if (event.coordinates && typeof event.coordinates === 'string') {
+        // PostGIS формат: "POINT(lng lat)"
+        const match = event.coordinates.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+        if (match) {
+          return {
+            ...event,
+            coordinates: {
+              lng: parseFloat(match[1]),
+              lat: parseFloat(match[2])
+            }
+          };
+        }
+      }
+      
+      // Если координаты уже в правильном формате
+      if (event.coordinates && event.coordinates.lat && event.coordinates.lng) {
+        return event;
+      }
+      
+      return {
+        ...event,
+        coordinates: null
+      };
+    });
   }, [events]);
 
   // Геокодируем адреса событий при их загрузке
@@ -185,7 +212,12 @@ const MainApp = () => {
         events.map(async (event) => {
           if (!event.coordinates && event.address) {
             const coords = await geocodeAddress(event.address);
-            return { ...event, coordinates: coords };
+            if (coords) {
+              return { 
+                ...event, 
+                coordinates: coords.point // Сохраняем в PostGIS формате
+              };
+            }
           }
           return event;
         })
