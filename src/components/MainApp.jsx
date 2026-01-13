@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight } from 'lucide-react';
+import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
 import { userService } from '../supabaseService';
@@ -1362,7 +1362,7 @@ const MainApp = () => {
         {activeTab === 'map' && (
           <div className="h-full overflow-y-auto bg-black animate-in fade-in">
             {/* КАРТА */}
-            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? '100vh' : '40vh', minHeight: isMapFullscreen ? '100vh' : '300px' }}>
+            <div className={`relative bg-[#0a0a0a] ${isMapFullscreen ? 'fixed inset-0 z-50 rounded-[32px] m-4' : 'mx-4 mt-4 rounded-[32px]'} border border-white/10 overflow-hidden`} style={{ height: isMapFullscreen ? 'calc(100vh - 120px)' : '40vh', minHeight: isMapFullscreen ? 'calc(100vh - 120px)' : '300px' }}>
               {userData && (
                 <>
                   {isMapFullscreen && (
@@ -1370,7 +1370,7 @@ const MainApp = () => {
                       onClick={() => setIsMapFullscreen(false)}
                       className="absolute top-4 right-4 z-[1000] bg-black/80 backdrop-blur-xl border border-white/10 p-3 rounded-full text-white hover:bg-white/20 transition-colors"
                     >
-                      <X size={20} />
+                      <Minimize2 size={20} />
                     </button>
                   )}
                   
@@ -1518,7 +1518,7 @@ const MainApp = () => {
                     className="bg-orange-600 p-2 rounded-full text-white hover:bg-orange-700 transition-colors"
                     title="Открыть на полный экран"
                   >
-                    <Navigation size={16} />
+                    <Maximize2 size={16} />
                   </button>
                 </div>
               )}
