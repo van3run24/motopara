@@ -1429,58 +1429,28 @@ const MainApp = () => {
                       {event.address && (
                         <button 
                           onClick={() => {
-                            // Получаем текущее местоположение пользователя
-                            navigator.geolocation.getCurrentPosition(
-                              (position) => {
-                                const lat = position.coords.latitude;
-                                const lng = position.coords.longitude;
-                                
-                                // Определяем, мобильное ли устройство
-                                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                                
-                                if (isMobile) {
-                                  // На мобильных открываем Яндекс Навигатор приложение
-                                  const yandexNavigatorUrl = `yandexnavi://build_route_on_map?lat_from=${lat}&lon_from=${lng}&lat_to=0&lon_to=0&text_to=${encodeURIComponent(event.address)}`;
-                                  
-                                  // Пробуем открыть приложение, если не получилось - открываем веб-версию
-                                  window.location.href = yandexNavigatorUrl;
-                                  
-                                  // Fallback на случай, если приложение не установлено
-                                  setTimeout(() => {
-                                    const webUrl = `https://yandex.ru/navi/?rtext=${lat},${lng}~${encodeURIComponent(event.address)}`;
-                                    window.open(webUrl, '_blank');
-                                  }, 2000);
-                                } else {
-                                  // На компьютере открываем веб-версию Яндекс Навигатора
-                                  const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${lat},${lng}~${encodeURIComponent(event.address)}`;
-                                  window.open(yandexNavigatorUrl, '_blank');
-                                }
-                              },
-                              (error) => {
-                                console.log('Could not get location, using fallback');
-                                
-                                // Определяем, мобильное ли устройство
-                                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                                
-                                if (isMobile) {
-                                  // На мобильных открываем Яндекс Навигатор приложение
-                                  const yandexNavigatorUrl = `yandexnavi://build_route_on_map?text_to=${encodeURIComponent(event.address)}`;
-                                  
-                                  // Пробуем открыть приложение
-                                  window.location.href = yandexNavigatorUrl;
-                                  
-                                  // Fallback на веб-версию
-                                  setTimeout(() => {
-                                    const webUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
-                                    window.open(webUrl, '_blank');
-                                  }, 2000);
-                                } else {
-                                  // На компьютере открываем веб-версию
-                                  const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
-                                  window.open(yandexNavigatorUrl, '_blank');
-                                }
-                              }
-                            );
+                            // Определяем, мобильное ли устройство
+                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            
+                            if (isMobile) {
+                              // На мобильных открываем Яндекс Навигатор приложение
+                              // Используем только текст адреса как конечную точку
+                              const yandexNavigatorUrl = `yandexnavi://build_route_on_map?text_to=${encodeURIComponent(event.address)}`;
+                              
+                              // Пробуем открыть приложение
+                              window.location.href = yandexNavigatorUrl;
+                              
+                              // Fallback на веб-версию
+                              setTimeout(() => {
+                                const webUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
+                                window.open(webUrl, '_blank');
+                              }, 2000);
+                            } else {
+                              // На компьютере открываем веб-версию Яндекс Навигатора
+                              // Тоже используем только адрес - навигатор сам определит текущее местоположение
+                              const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
+                              window.open(yandexNavigatorUrl, '_blank');
+                            }
                           }}className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
                           <MapPin size={14} className="shrink-0" />
