@@ -80,6 +80,44 @@ const MainApp = () => {
     }
   };
 
+  // Функция геокодирования адреса через Yandex API
+  const geocodeAddress = async (address) => {
+    if (!address) return null;
+    
+    try {
+      const response = await fetch(`https://geocode-maps.yandex.ru/1.x/?apikey=YOUR_YANDEX_API_KEY&geocode=${encodeURIComponent(address)}&format=json`);
+      const data = await response.json();
+      
+      if (data.response.GeoObjectCollection.featureMember.length > 0) {
+        const coords = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos.split(' ');
+        return {
+          lat: parseFloat(coords[1]),
+          lng: parseFloat(coords[0])
+        };
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+    
+    return null;
+  };
+
+  // Мемоизированные события с координатами
+  const eventsWithCoords = useMemo(async () => {
+    const eventsWithLocation = await Promise.all(
+      events.map(async (event) => {
+        if (event.coordinates) {
+          return event;
+        }
+        
+        const coords = await geocodeAddress(event.address);
+        return { ...event, coordinates: coords };
+      })
+    );
+    
+    return eventsWithLocation.filter(event => event.coordinates);
+  }, [events]);
+
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
     if (user.image) return user.image;
@@ -1150,6 +1188,71 @@ const MainApp = () => {
                         </Marker>
                       );
                    })}
+                   
+                   {/* Events Markers */}
+                   {events.filter(e => e.coordinates && e.city === userData?.city).map((event, idx) => {
+                      const eventIcon = L.divIcon({
+                        html: `
+                          <div style="
+                            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                            border: 3px solid white;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 16px;
+                            transform: translateY(-50%);
+                            position: relative;
+                            z-index: 1000;
+                          ">
+                            📅
+                          </div>
+                        `,
+                        className: 'event-marker',
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 36],
+                        popupAnchor: [0, -30],
+                        shadowSize: [0, 0]
+                      });
+                      
+                      return (
+                        <Marker 
+                          key={event.id} 
+                          position={[event.coordinates.lat, event.coordinates.lng]} 
+                          icon={eventIcon}
+                        >
+                          <Popup className="custom-popup">
+                            <div className="w-56 bg-[#1c1c1e] text-white p-0 rounded-xl overflow-hidden shadow-xl border border-white/10">
+                              <div className="p-4">
+                                <h3 className="font-black text-lg mb-2">{event.title}</h3>
+                                <p className="text-sm text-zinc-300 mb-3 line-clamp-2">{event.description}</p>
+                                <div className="space-y-2 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-orange-500" />
+                                    <span>{event.date} в {event.time}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-orange-500" />
+                                    <span>{event.address}</span>
+                                  </div>
+                                </div>
+                                {event.link && (
+                                  <button 
+                                    onClick={() => window.open(event.link, '_blank')}
+                                    className="w-full mt-3 bg-orange-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors"
+                                  >
+                                    Подробнее
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                   })}
                 </MapContainer>
               )}
               
@@ -1209,10 +1312,17 @@ const MainApp = () => {
                         )}
                       </div>
                       {event.address && (
-                        <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
+                        <button 
+                          onClick={() => {
+                            const userLocation = `${userLocation?.lat || 55.7558},${userLocation?.lng || 37.6173}`;
+                            const yandexMapsUrl = `https://yandex.ru/maps/?rtext=${encodeURIComponent(userLocation)}~${encodeURIComponent(event.address)}&rtt=auto`;
+                            window.open(yandexMapsUrl, '_blank');
+                          }}
+                          className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
+                        >
                           <MapPin size={14} className="shrink-0" />
                           <span className="truncate">{event.address}</span>
-                        </div>
+                        </button>
                       )}
                     </div>
                     {event.link && (

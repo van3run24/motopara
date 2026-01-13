@@ -215,12 +215,25 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       const { data: events, error } = await supabase
         .from('events')
         .select('*')
-        .eq('city', userData.city)
-        .order('date', { ascending: true });
+        .gte('date', new Date().toISOString().split('T')[0]) // Только будущие и сегодняшние события
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
       
       if (error) throw error;
-      onEventsLoaded(events || []);
       
+      // Автоудаление прошедших событий
+      const { error: deleteError } = await supabase
+        .from('events')
+        .lt('date', new Date().toISOString().split('T')[0])
+        .delete();
+        
+      if (deleteError) {
+        console.error('Error deleting old events:', deleteError);
+      } else {
+        console.log('Deleted past events');
+      }
+      
+      onEventsLoaded(events || []);
     } catch (err) {
       console.error('Error loading events:', err);
       setError(err.message);
