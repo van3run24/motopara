@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
 import { supabase } from '../supabaseClient';
-import { userService } from '../supabaseService';
+import { userService, compressImage } from '../supabaseService';
 import { cities } from '../data/cities';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -1029,8 +1029,12 @@ const MainApp = () => {
         if (isProfile) {
             const file = e.target.files[0];
             console.log('Uploading avatar:', file.name);
+            console.log('Original file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
             
             try {
+                // Показываем пользователю что происходит сжатие
+                console.log('Сжимаем изображение...');
+                
                 const imageUrl = await userService.uploadAvatar(userId, file);
                 console.log('Avatar uploaded:', imageUrl);
                 
@@ -1057,8 +1061,12 @@ const MainApp = () => {
         } else if (isGallery) {
             const file = e.target.files[0];
             console.log('Uploading gallery image:', file.name);
+            console.log('Original gallery file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
             
             try {
+                // Показываем пользователю что происходит сжатие
+                console.log('Сжимаем изображение для галереи...');
+                
                 const imageUrl = await userService.uploadGalleryImage(userId, file);
                 console.log('Gallery image uploaded:', imageUrl);
                 

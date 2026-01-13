@@ -1,5 +1,47 @@
 import { supabase } from './supabaseClient';
 
+// Функция для сжатия изображений
+export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.8) => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      // Вычисляем новые размеры с сохранением пропорций
+      let { width, height } = img;
+      
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width *= ratio;
+        height *= ratio;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Рисуем сжатое изображение
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Конвертируем в blob с указанным качеством
+      canvas.toBlob(
+        (blob) => {
+          // Создаем новый File из blob
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          resolve(compressedFile);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    
+    img.src = URL.createObjectURL(file);
+  });
+};
+
 // Функции для работы с пользователями
 export const userService = {
   // Получение всех пользователей
@@ -57,15 +99,18 @@ export const userService = {
 
   // Загрузка аватара в Supabase Storage
   async uploadAvatar(userId, file) {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}/avatar.${fileExt}`;
+    console.log('Original file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
     
-    // Проверяем существование бакета, если нет - создаем (только если есть права)
-    // В реальном приложении бакеты создаются администратором заранее
+    // Сжимаем изображение перед загрузкой
+    const compressedFile = await compressImage(file, 800, 800, 0.8);
+    console.log('Compressed file size:', (compressedFile.size / 1024 / 1024).toFixed(2) + ' MB');
+    
+    const fileExt = 'jpg'; // Всегда сохраняем как JPG после сжатия
+    const fileName = `${userId}/avatar.${fileExt}`;
     
     const { data, error } = await supabase.storage
       .from('avatars')
-      .upload(fileName, file, {
+      .upload(fileName, compressedFile, {
         cacheControl: '3600',
         upsert: true
       });
@@ -90,12 +135,18 @@ export const userService = {
 
   // Загрузка фото в галерею
   async uploadGalleryImage(userId, file) {
-    const fileExt = file.name.split('.').pop();
+    console.log('Original gallery file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
+    
+    // Сжимаем изображение перед загрузкой (для галереи используем чуть меньшее качество)
+    const compressedFile = await compressImage(file, 1200, 1200, 0.7);
+    console.log('Compressed gallery file size:', (compressedFile.size / 1024 / 1024).toFixed(2) + ' MB');
+    
+    const fileExt = 'jpg'; // Всегда сохраняем как JPG после сжатия
     const fileName = `${userId}/gallery/${Date.now()}.${fileExt}`;
     
     const { data, error } = await supabase.storage
       .from('gallery')
-      .upload(fileName, file, {
+      .upload(fileName, compressedFile, {
         cacheControl: '3600',
         upsert: false
       });
