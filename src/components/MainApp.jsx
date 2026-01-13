@@ -174,69 +174,34 @@ const MainApp = () => {
   // Функция для добавления координат к событиям
   const eventsWithCoordinates = useMemo(() => {
     return events.map(event => {
+      let coords = null;
+      
       // Если координаты есть в PostGIS формате, извлекаем lat/lng
       if (event.coordinates && typeof event.coordinates === 'string') {
-        // PostGIS формат: "POINT(lng lat)"
         const match = event.coordinates.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
         if (match) {
-          return {
-            ...event,
-            coordinates: {
-              lng: parseFloat(match[1]),
-              lat: parseFloat(match[2])
-            }
+          coords = {
+            lng: parseFloat(match[1]),
+            lat: parseFloat(match[2])
           };
         }
-      }
-      
-      // Если координаты уже в правильном формате
-      if (event.coordinates && event.coordinates.lat && event.coordinates.lng) {
-        return event;
+      } else if (event.coordinates && event.coordinates.lat && event.coordinates.lng) {
+        // Если координаты уже в правильном формате
+        coords = {
+          lat: event.coordinates.lat,
+          lng: event.coordinates.lng
+        };
       }
       
       return {
         ...event,
-        coordinates: null
+        coordinates: coords
       };
     });
   }, [events]);
 
-  // Геокодируем адреса событий при их загрузке
-  useEffect(() => {
-    const geocodeEvents = async () => {
-      const eventsToGeocode = events.filter(event => !event.coordinates && event.address);
-      
-      if (eventsToGeocode.length === 0) return;
-      
-      const updatedEvents = await Promise.all(
-        events.map(async (event) => {
-          if (!event.coordinates && event.address) {
-            const coords = await geocodeAddress(event.address);
-            if (coords) {
-              return { 
-                ...event, 
-                coordinates: coords.point // Сохраняем в PostGIS формате
-              };
-            }
-          }
-          return event;
-        })
-      );
-      
-      // Обновляем только если есть новые координаты
-      const hasNewCoordinates = updatedEvents.some((event, index) => 
-        event.coordinates !== events[index]?.coordinates
-      );
-      
-      if (hasNewCoordinates) {
-        setEvents(updatedEvents);
-      }
-    };
-
-    if (events.length > 0) {
-      geocodeEvents();
-    }
-  }, [events.filter(e => !e.coordinates && e.address).length]); // Запускаем при изменении количества событий без координат
+  // Геокодирование событий будет происходить при их создании/обновлении в SupabaseManager
+  // Убираем useEffect здесь чтобы избежать бесконечных циклов
 
   const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
@@ -435,7 +400,9 @@ const MainApp = () => {
     // Reset typing state when chat changes
     setIsPartnerTyping(false);
 
-    const unsubscribe = window.supabaseManager.subscribeToTyping(selectedChat.id, (payload) => {
+    let unsubscribe = null; // Объявляем переменную заранее
+    
+    unsubscribe = window.supabaseManager.subscribeToTyping(selectedChat.id, (payload) => {
       setIsPartnerTyping(true);
       
       if (typingTimeoutRef.current) {
