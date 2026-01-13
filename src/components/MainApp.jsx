@@ -23,37 +23,49 @@ const AddressAutocomplete = ({ value, onChange, placeholder }) => {
 
     setLoading(true);
     try {
-      // Попытка использовать API Яндекс.Карт если доступен ключ
-      if (process.env.REACT_APP_YANDEX_API_KEY) {
-        const response = await fetch(
-          `https://suggest-maps.yandex.ru/v1/suggest?apikey=${process.env.REACT_APP_YANDEX_API_KEY}&text=${encodeURIComponent(query)}&type=geo&results=5`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const addresses = data.results?.map(item => item.text) || [];
-          setSuggestions(addresses);
-          return;
+      // Используем OpenStreetMap Nominatim API (бесплатный, без ключа)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&countrycodes=ru`,
+        {
+          headers: {
+            'User-Agent': 'Motoznakomstva App' // Важно для Nominatim
+          }
         }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const addresses = data.map(item => {
+          // Форматируем адрес в удобный вид
+          const parts = [];
+          if (item.address?.road) parts.push(item.address.road);
+          if (item.address?.house_number) parts.push(item.address.house_number);
+          if (item.address?.suburb) parts.push(item.address.suburb);
+          if (item.address?.city || item.address?.town || item.address?.village) {
+            parts.push(item.address?.city || item.address?.town || item.address?.village);
+          }
+          
+          return parts.length > 0 ? parts.join(', ') : item.display_name.split(',')[0];
+        }).filter(addr => addr && addr.length > 3);
+        
+        setSuggestions(addresses.slice(0, 5));
+        return;
       }
       
-      // Fallback: генерируем простые подсказки на основе города пользователя
-      const commonStreetTypes = ['улица', 'проспект', 'площадь', 'шоссе', 'бульвар', 'переулок', 'проезд', 'набережная'];
-      const commonPlaces = ['Центр', 'Парк', 'Сквер', 'Площадь', 'Вокзал', 'Аэропорт', 'Стадион'];
+      // Fallback: генерируем простые подсказки
+      const commonStreetTypes = ['улица', 'проспект', 'площадь', 'шоссе', 'бульвар'];
+      const commonPlaces = ['Центр', 'Парк', 'Сквер', 'Площадь', 'Вокзал', 'Стадион'];
       
       const fallbackSuggestions = [];
       
-      // Добавляем варианты с типами улиц
       commonStreetTypes.slice(0, 3).forEach(type => {
         fallbackSuggestions.push(`${query} ${type}`);
       });
       
-      // Добавляем популярные места
       commonPlaces.slice(0, 2).forEach(place => {
         fallbackSuggestions.push(`${place} "${query}"`);
       });
       
-      // Добавляем базовые варианты
       fallbackSuggestions.push(`${query}`, `${query} центр`, `кафе ${query}`, `ресторан ${query}`);
       
       setSuggestions(fallbackSuggestions.slice(0, 5));
@@ -325,9 +337,14 @@ const MainApp = () => {
                     }
                     
                     // Проверяем, новый ли это пользователь (пустой профиль)
-                    if (!user.name || !user.age || !user.bio || !user.images || user.images.length === 0) {
+                    // Показываем приветствие только если профиль действительно пустой
+                    const isEmptyProfile = !user.name || !user.age || !user.bio || !user.images || user.images.length === 0;
+                    const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
+                    
+                    if (isEmptyProfile && !hasSeenWelcome) {
                       setIsNewUser(true);
                       setShowWelcomeModal(true);
+                      localStorage.setItem('hasSeenWelcome', 'true');
                     }
                   }
               }
@@ -1879,7 +1896,7 @@ const MainApp = () => {
                   )}
                 </div>
               </button>
-              <button onClick={() => setShowSettings(true)} className="absolute bottom-0 right-0 bg-orange-600 p-3 rounded-2xl border-4 border-black text-white transition-transform active:scale-90"><Edit3 size={18} /></button>
+              <button onClick={() => setShowSettings(true)} data-edit-profile="true" className="absolute bottom-0 right-0 bg-orange-600 p-3 rounded-2xl border-4 border-black text-white transition-transform active:scale-90"><Edit3 size={18} /></button>
             </div>
             <h2 className="text-2xl font-black uppercase italic mb-2">{userData.name}</h2>
             <p className="text-zinc-600 text-xs font-bold uppercase tracking-[0.2em] mb-2">{userData.city}</p>
@@ -1919,7 +1936,7 @@ const MainApp = () => {
               className="hidden"
             />
             <div className="w-full max-w-md space-y-3">
-              <button onClick={() => setShowSettings(true)} className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
+              <button onClick={() => setShowSettings(true)} data-edit-profile="true" className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-[32px] flex items-center justify-between">
                 <div className="flex items-center gap-4 text-orange-500"><Edit3 size={20}/><span className="font-bold uppercase tracking-tighter text-sm text-white">Редактирование анкеты</span></div>
                 <ChevronLeft size={20} className="rotate-180 text-zinc-700" />
               </button>
@@ -2498,10 +2515,6 @@ const MainApp = () => {
             </button>
             
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-orange-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-4xl font-black text-orange-500">🏍️</span>
-              </div>
-              
               <h2 className="text-2xl font-black italic uppercase tracking-tight mb-4">
                 Приветствуем в <span className="text-orange-500">МОТОЗНАКОМСТВА</span>
               </h2>
@@ -2534,7 +2547,14 @@ const MainApp = () => {
               <button 
                 onClick={() => {
                   setShowWelcomeModal(false);
-                  setActiveTab('profile'); // Переключаем на вкладку профиля
+                  setActiveTab('profile');
+                  setTimeout(() => {
+                    // Имитируем клик на кнопку редактирования профиля
+                    const editButton = document.querySelector('[data-edit-profile="true"]');
+                    if (editButton) {
+                      editButton.click();
+                    }
+                  }, 100);
                 }}
                 className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 rounded-2xl shadow-[0_20px_40px_-15px_rgba(234,88,12,0.3)] transition-all active:scale-[0.98] flex items-center justify-center gap-2"
               >
