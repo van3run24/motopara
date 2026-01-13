@@ -242,7 +242,7 @@ const MainApp = () => {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array('BLc1xPvF8jHq3xL8f9k2mN4p7r6sT5uV8wX2yZ1aQ3bC4dE5fG6hI7jK8lM9nO0p')
+          applicationServerKey: urlB64ToUint8Array('BJjpNkIbnYXoftgL755_wE_IeooVx-pN-Pl_nZM7UpQ_TpUl1tNACNdPBr3q5MqzfdFxoLcW8aIQq8TE8a_ddbE')
         });
 
         // Сохраняем подписку в базу данных
