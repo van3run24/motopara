@@ -10,137 +10,68 @@ function App() {
                  window.navigator.standalone || 
                  document.referrer.includes('android-app://');
   
-  // Состояния
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Логика для открытия/закрытия окна
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(isPWA); // В PWA сразу открываем модалку
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Состояние входа
   const [showCookies, setShowCookies] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const howItWorksRef = useRef(null);
   
-  // Логика для открытия/закрытия окна
+  // В PWA режиме запрещаем закрытие модалки входа
   const handleModalClose = () => {
     if (!isPWA) {
       setIsAuthModalOpen(false);
     }
+    // В PWA модалку нельзя закрыть
   };
 
   useEffect(() => {
-    let mounted = true;
-    
-    // Проверяем сессии асинхронно, но быстро
-    const checkSession = async () => {
-      try {
-        // Сначала проверяем localStorage (быстро)
-        const storedUserId = localStorage.getItem('userId');
-        const storedSession = localStorage.getItem('supabase.auth.token');
-        
-        if (storedUserId && storedSession) {
-          // Если есть данные в localStorage, сразу показываем приложение
-          if (mounted) {
-            setIsLoggedIn(true);
-            setIsLoading(false);
-          }
-          
-          // Затем проверяем валидность сессии в фоне
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session && mounted) {
-            // Если сессия невалидна, показываем лендинг
-            setIsLoggedIn(false);
-            if (!isPWA) {
-              setIsAuthModalOpen(true);
-            }
-          }
-        } else {
-          // Если нет данных в localStorage, проверяем сессию
-          const { data: { session } } = await supabase.auth.getSession();
-          if (mounted) {
-            if (session) {
-              setIsLoggedIn(true);
-              localStorage.setItem('userId', session.user.id);
-            } else {
-              setIsLoggedIn(false);
-              if (!isPWA) {
-                setIsAuthModalOpen(true);
-              }
-            }
-            setIsLoading(false);
-          }
-        }
-      } catch (error) {
-        console.error('Session check error:', error);
-        if (mounted) {
-          setIsLoading(false);
-          if (!isPWA) {
-            setIsAuthModalOpen(true);
-          }
-        }
+    // Проверка сессии при загрузке
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('userId', session.user.id);
       }
-    };
+    });
 
     // Подписка на изменения сессии
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        if (session) {
-          setIsLoggedIn(true);
-          localStorage.setItem('userId', session.user.id);
-        } else {
-          setIsLoggedIn(false);
-          localStorage.removeItem('userId');
-          if (!isPWA) {
-            setIsAuthModalOpen(true);
-          }
-        }
+      if (session) {
+        setIsLoggedIn(true);
+        localStorage.setItem('userId', session.user.id);
+      } else {
+        setIsLoggedIn(false);
+        localStorage.removeItem('userId');
       }
     });
 
-    // Проверка cookies
     const cookiesAccepted = localStorage.getItem('cookiesAccepted');
-    if (!cookiesAccepted && mounted) {
+    if (!cookiesAccepted) {
       setTimeout(() => setShowCookies(true), 1000);
     }
 
-    // Запускаем проверку сессии
-    checkSession();
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [isPWA]);
-
-  // Показываем загрузочный экран во время проверки сессии
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-zinc-400 text-sm">Загрузка...</p>
-        </div>
-      </div>
-    );
-  }
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Если залогинены — показываем основное приложение
   if (isLoggedIn) {
     return <MainApp />;
   }
-
   return (
     <div className="min-h-screen bg-[#000000] text-white font-sans antialiased selection:bg-orange-500 selection:text-white">
       
       {/* Фоновое свечение */}
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Лендинг только не в PWA */}
+      {/* Лэндинг только не в PWA */}
       {!isPWA && (
         <div className="transition-opacity duration-300">
           {/* Навигация */}
           <nav className="fixed top-0 w-full z-40 backdrop-blur-2xl bg-black/40 border-b border-white/[0.05] px-4 md:px-0">
             <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
               <div className="text-xl font-bold tracking-tighter italic uppercase">
-                МОТО<span className="text-orange-500 font-black">ЗНАКОМСТВА</span>
+                    МОТО<span className="text-orange-500 font-black">ЗНАКОМСТВА</span>
               </div>
               <button 
                 onClick={() => setIsAuthModalOpen(true)}
