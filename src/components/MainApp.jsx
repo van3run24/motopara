@@ -23,52 +23,39 @@ const AddressAutocomplete = ({ value, onChange, placeholder }) => {
 
     setLoading(true);
     try {
-      // Используем OpenStreetMap Nominatim API (бесплатный, без ключа)
+      // Используем 2GIS API для автоподстановки адресов (бесплатный)
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&countrycodes=ru`,
-        {
-          headers: {
-            'User-Agent': 'Motoznakomstva App' // Важно для Nominatim
-          }
-        }
+        `https://catalog.api.2gis.com/3.0/items?q=${encodeURIComponent(query)}&type=address&region_id=1&limit=5&key=ruhxhd1483`
       );
       
       if (response.ok) {
         const data = await response.json();
-        const addresses = data.map(item => {
+        const addresses = data.result?.map(item => {
           // Форматируем адрес в удобный вид
-          const parts = [];
-          if (item.address?.road) parts.push(item.address.road);
-          if (item.address?.house_number) parts.push(item.address.house_number);
-          if (item.address?.suburb) parts.push(item.address.suburb);
-          if (item.address?.city || item.address?.town || item.address?.village) {
-            parts.push(item.address?.city || item.address?.town || item.address?.village);
-          }
-          
-          return parts.length > 0 ? parts.join(', ') : item.display_name.split(',')[0];
-        }).filter(addr => addr && addr.length > 3);
+          const fullName = item.name || '';
+          const addressText = item.address_name || item.description || fullName;
+          return addressText;
+        }).filter(addr => addr && addr.length > 3).slice(0, 5);
         
-        setSuggestions(addresses.slice(0, 5));
+        setSuggestions(addresses);
         return;
       }
       
-      // Fallback: генерируем простые подсказки
-      const commonStreetTypes = ['улица', 'проспект', 'площадь', 'шоссе', 'бульвар'];
-      const commonPlaces = ['Центр', 'Парк', 'Сквер', 'Площадь', 'Вокзал', 'Стадион'];
+      // Fallback: простые но полезные подсказки на основе города
+      const citySuggestions = [
+        `${query} улица`,
+        `${query} проспект`, 
+        `${query} площадь`,
+        `${query} шоссе`,
+        `${query} бульвар`,
+        `кафе ${query}`,
+        `ресторан ${query}`,
+        `парк ${query}`,
+        `ТЦ ${query}`,
+        `${query} центр`
+      ];
       
-      const fallbackSuggestions = [];
-      
-      commonStreetTypes.slice(0, 3).forEach(type => {
-        fallbackSuggestions.push(`${query} ${type}`);
-      });
-      
-      commonPlaces.slice(0, 2).forEach(place => {
-        fallbackSuggestions.push(`${place} "${query}"`);
-      });
-      
-      fallbackSuggestions.push(`${query}`, `${query} центр`, `кафе ${query}`, `ресторан ${query}`);
-      
-      setSuggestions(fallbackSuggestions.slice(0, 5));
+      setSuggestions(citySuggestions.slice(0, 5));
       
     } catch (error) {
       console.error('Error fetching address suggestions:', error);
@@ -1434,22 +1421,27 @@ const MainApp = () => {
                             
                             if (isMobile) {
                               // На мобильных открываем Яндекс Навигатор приложение
-                              // Используем только текст адреса как конечную точку
-                              const yandexNavigatorUrl = `yandexnavi://build_route_on_map?text_to=${encodeURIComponent(event.address)}`;
+                              // Используем правильный формат для конечной точки
+                              const yandexNavigatorUrl = `yandexnavi://show_point?text=${encodeURIComponent(event.address)}&lat=&lon=`;
                               
                               // Пробуем открыть приложение
                               window.location.href = yandexNavigatorUrl;
                               
-                              // Fallback на веб-версию
+                              // Fallback - строим маршрут до точки
                               setTimeout(() => {
-                                const webUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
+                                const routeUrl = `yandexnavi://build_route_on_map?text_to=${encodeURIComponent(event.address)}`;
+                                window.location.href = routeUrl;
+                              }, 1000);
+                              
+                              // Если приложение не установлено - открываем веб-версию
+                              setTimeout(() => {
+                                const webUrl = `https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`;
                                 window.open(webUrl, '_blank');
-                              }, 2000);
+                              }, 3000);
                             } else {
-                              // На компьютере открываем веб-версию Яндекс Навигатора
-                              // Тоже используем только адрес - навигатор сам определит текущее местоположение
-                              const yandexNavigatorUrl = `https://yandex.ru/navi/?rtext=${encodeURIComponent(event.address)}`;
-                              window.open(yandexNavigatorUrl, '_blank');
+                              // На компьютере открываем Яндекс Карты с точкой
+                              const yandexMapsUrl = `https://yandex.ru/maps/?text=${encodeURIComponent(event.address)}`;
+                              window.open(yandexMapsUrl, '_blank');
                             }
                           }}className="flex items-center gap-2 text-xs text-zinc-500 px-1 hover:text-orange-500 transition-colors cursor-pointer"
                         >
