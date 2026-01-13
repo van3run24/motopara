@@ -5,6 +5,13 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
+-- Enable Realtime for tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.likes;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
+
 -- Add is_read column to messages table if it doesn't exist
 DO $$
 BEGIN
