@@ -46,7 +46,8 @@ function App() {
           if (!session && mounted) {
             // Если сессия невалидна, показываем лендинг
             setIsLoggedIn(false);
-            if (!isPWA) {
+            // НЕ открываем модалку автоматически для веб-версии
+            if (isPWA) {
               setIsAuthModalOpen(true);
             }
           }
@@ -59,7 +60,8 @@ function App() {
               localStorage.setItem('userId', session.user.id);
             } else {
               setIsLoggedIn(false);
-              if (!isPWA) {
+              // НЕ открываем модалку автоматически для веб-версии
+              if (isPWA) {
                 setIsAuthModalOpen(true);
               }
             }
@@ -70,7 +72,8 @@ function App() {
         console.error('Session check error:', error);
         if (mounted) {
           setIsLoading(false);
-          if (!isPWA) {
+          // НЕ открываем модалку автоматически для веб-версии
+          if (isPWA) {
             setIsAuthModalOpen(true);
           }
         }
@@ -88,7 +91,8 @@ function App() {
         } else {
           setIsLoggedIn(false);
           localStorage.removeItem('userId');
-          if (!isPWA) {
+          // НЕ открываем модалку автоматически для веб-версии
+          if (isPWA) {
             setIsAuthModalOpen(true);
           }
         }
