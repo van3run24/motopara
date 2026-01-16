@@ -39,6 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_event_messages_created_at ON event_messages(creat
 
 -- RLS политики для event_chats
 ALTER TABLE event_chats ENABLE ROW LEVEL SECURITY;
+
+-- Удаляем существующую политику если есть
+DROP POLICY IF EXISTS "Users can view event chats for events they can see" ON event_chats;
+
 CREATE POLICY "Users can view event chats for events they can see" ON event_chats
     FOR SELECT USING (
         EXISTS (
@@ -52,12 +56,23 @@ CREATE POLICY "Users can view event chats for events they can see" ON event_chat
 
 -- RLS политики для event_participants
 ALTER TABLE event_participants ENABLE ROW LEVEL SECURITY;
+
+-- Удаляем существующие политики если есть
+DROP POLICY IF EXISTS "Users can view event participants" ON event_participants;
+DROP POLICY IF EXISTS "Users can join event chats" ON event_participants;
+DROP POLICY IF EXISTS "Users can leave event chats" ON event_participants;
+DROP POLICY IF EXISTS "Users can delete own event participants" ON event_participants;
+
 CREATE POLICY "Users can view event participants" ON event_participants
     FOR SELECT USING (
-        user_id = auth.uid() OR 
-        EXISTS (
-            SELECT 1 FROM event_chats 
-            WHERE event_chats.id = event_participants.chat_id
+        chat_id IN (
+            SELECT id FROM event_chats 
+            WHERE event_chats.event_id IN (
+                SELECT id FROM events 
+                WHERE events.city = (
+                    SELECT city FROM auth.users WHERE auth.users.id = auth.uid()
+                )
+            )
         )
     );
 
@@ -71,8 +86,17 @@ CREATE POLICY "Users can leave event chats" ON event_participants
         user_id = auth.uid()
     );
 
+CREATE POLICY "Users can delete own event participants" ON event_participants
+    FOR DELETE USING (
+        user_id = auth.uid()
+    );
+
 -- RLS политики для event_messages
 ALTER TABLE event_messages ENABLE ROW LEVEL SECURITY;
+
+-- Удаляем существующие политики если есть
+DROP POLICY IF EXISTS "Users can view messages in joined event chats" ON event_messages;
+
 CREATE POLICY "Users can view messages in joined event chats" ON event_messages
     FOR SELECT USING (
         EXISTS (
