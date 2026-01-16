@@ -259,7 +259,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         `)
         .eq('city', userData.city)
         // Загружаем события созданные сегодня или в будущем
-        .or(`date.gt.${todayString},and(date.eq.${todayString},time.ge.${currentTime})`)
+        .or(`date.gt.${todayString} and date.eq.${todayString} and time.ge.${currentTime})`)
         .order('date', { ascending: true })
         .order('time', { ascending: true });
       
