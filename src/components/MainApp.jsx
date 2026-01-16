@@ -2497,70 +2497,70 @@ const MainApp = () => {
                       <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
                         {/* Имя отправителя для входящих сообщений */}
                         {!isOwnMessage && showName && (
-                          <div className="px-3 pb-1">
+                          <div className="px-9 pb-1">
                             <span className="text-xs font-bold text-orange-500 uppercase">
                               {msg.sender?.name || 'Пользователь'}
                             </span>
                           </div>
                         )}
                         
-                        <div className={`group relative px-4 py-2 rounded-2xl ${
-                          isOwnMessage 
-                            ? 'bg-orange-600 text-white rounded-br-md' 
-                            : 'bg-white/10 text-white rounded-bl-md'
-                        }`}>
-                          {msg.type === 'text' && (
-                            <p className="text-sm leading-relaxed break-words">{msg.text}</p>
-                          )}
-                          {msg.type === 'image' && (
-                            <img 
-                              src={msg.image} 
-                              alt="Message image" 
-                              className="rounded-xl max-w-full cursor-pointer active:scale-95 transition-transform"
-                              onClick={() => {
-                                setSelectedImage(msg.image);
-                                const chatImages = selectedGroupChat?.messages?.filter(m => m.type === 'image').map(m => m.image) || [];
-                                const currentIndex = chatImages.indexOf(msg.image);
-                                setImageContext({ type: 'chat', images: chatImages, currentIndex });
-                              }}
-                              loading="lazy"
-                            />
-                          )}
-                          <div className={`flex items-center gap-1 mt-1 text-xs ${
-                            isOwnMessage ? 'text-orange-200' : 'text-zinc-500'
-                          }`}>
-                            <span>{formatMessageTime(msg.created_at)}</span>
-                            {isOwnMessage && (
-                              <span className="ml-1">
-                                {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Аватарка для входящих сообщений слева от хвостика */}
+                        <div className={`group relative flex items-end gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                          {/* Аватарка для входящих сообщений */}
                           {!isOwnMessage && (
-                            <div className="absolute -left-7 bottom-0">
-                              <button
-                                onClick={() => {
-                                  const sender = msg.sender;
-                                  if (sender) {
-                                    const fullUserData = bikers.find(b => b.id === sender.id);
-                                    if (fullUserData) {
-                                      setMatchData(fullUserData);
-                                      setViewingProfile(true);
-                                    }
+                            <button
+                              onClick={() => {
+                                const sender = msg.sender;
+                                if (sender) {
+                                  const fullUserData = bikers.find(b => b.id === sender.id);
+                                  if (fullUserData) {
+                                    setMatchData(fullUserData);
+                                    setViewingProfile(true);
                                   }
-                                }}
-                                className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
-                              >
-                                {msg.sender?.image ? (
-                                  <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
-                                ) : (
-                                  <User size={12} className="text-white" />
-                                )}
-                              </button>
-                            </div>
+                                }
+                              }}
+                              className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
+                            >
+                              {msg.sender?.image ? (
+                                <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
+                              ) : (
+                                <User size={12} className="text-white" />
+                              )}
+                            </button>
                           )}
+                          
+                          <div className={`px-4 py-2 rounded-2xl ${
+                            isOwnMessage 
+                              ? 'bg-orange-600 text-white rounded-br-md' 
+                              : 'bg-white/10 text-white rounded-bl-md'
+                          }`}>
+                            {msg.type === 'text' && (
+                              <p className="text-sm leading-relaxed break-words">{msg.text}</p>
+                            )}
+                            {msg.type === 'image' && (
+                              <img 
+                                src={msg.image} 
+                                alt="Message image" 
+                                className="rounded-xl max-w-full cursor-pointer active:scale-95 transition-transform"
+                                onClick={() => {
+                                  setSelectedImage(msg.image);
+                                  const chatImages = selectedGroupChat?.messages?.filter(m => m.type === 'image').map(m => m.image) || [];
+                                  const currentIndex = chatImages.indexOf(msg.image);
+                                  setImageContext({ type: 'chat', images: chatImages, currentIndex });
+                                }}
+                                loading="lazy"
+                              />
+                            )}
+                            <div className={`flex items-center gap-1 mt-1 text-xs ${
+                              isOwnMessage ? 'text-orange-200' : 'text-zinc-500'
+                            }`}>
+                              <span>{formatMessageTime(msg.created_at)}</span>
+                              {isOwnMessage && (
+                                <span className="ml-1">
+                                  {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
