@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
+import EventGroupChat from './EventGroupChat';
 import { supabase } from '../supabaseClient';
 import { userService, compressImage } from '../supabaseService';
 import { cities } from '../data/cities';
@@ -613,6 +614,7 @@ const MainApp = () => {
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [viewingProfile, setViewingProfile] = useState(null);
+  const [selectedEventChat, setSelectedEventChat] = useState(null); // Для группового чата события
   
   // Settings States
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -626,7 +628,7 @@ const MainApp = () => {
   const [chats, setChats] = useState([]);
   const [newMatches, setNewMatches] = useState([]);
 
-  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '', max_participants: '' });
   const fileInputRef = useRef(null);
   const profileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -1192,6 +1194,7 @@ const MainApp = () => {
           time: newEvent.time,
           address: newEvent.address,
           link: newEvent.link,
+          ...(newEvent.max_participants && { max_participants: parseInt(newEvent.max_participants) }),
           created_by_id: userId,
           created_at: new Date().toISOString()
         };
@@ -1448,8 +1451,18 @@ const MainApp = () => {
   return (
     <div className="fixed top-0 left-0 w-full h-full supports-[height:100dvh]:h-[100dvh] bg-black text-white flex flex-col overflow-hidden font-sans animate-in fade-in duration-500">
       
+      {/* Event Group Chat */}
+      {selectedEventChat && (
+        <EventGroupChat
+          eventId={selectedEventChat.id}
+          eventName={selectedEventChat.title}
+          onBack={() => setSelectedEventChat(null)}
+          userData={userData}
+        />
+      )}
+      
       {/* Supabase Manager - работает в фоне */}
-      {userData && (
+      {userData && !selectedEventChat && (
         <SupabaseManager 
           userData={userData}
           onUsersLoaded={setBikers}
@@ -1458,7 +1471,7 @@ const MainApp = () => {
         />
       )}
       
-      {!selectedChat && !viewingProfile && (
+      {!selectedEventChat && !selectedChat && !viewingProfile && (
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
           <div className="text-lg font-black tracking-tighter italic uppercase">Мото<span className="text-orange-500">Знакомства</span></div>
           <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center overflow-hidden ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
@@ -1801,8 +1814,8 @@ const MainApp = () => {
               )}
             </div>
 
-            {/* СЕКЦИЯ СОБЫТИЙ - только не в полноэкранном режиме */}
-            {!isMapFullscreen && (
+            {/* СЕКЦИЯ СОБЫТИЙ - только не в полноэкранном режиме и не в групповом чате */}
+            {!isMapFullscreen && !selectedEventChat && (
               <div className="px-4 mt-6 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">События в вашем городе</h3>
@@ -1821,6 +1834,11 @@ const MainApp = () => {
                     <div key={event.id} className="bg-white/3 border border-white/5 rounded-[24px] p-5 relative group">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-bold text-sm uppercase italic flex-1 pr-6">{event.title}</h4>
+                        {event.max_participants && (
+                          <div className="text-xs text-zinc-500 bg-white/5 px-2 py-1 rounded-full">
+                            {event.participants_count || 0}/{event.max_participants}
+                          </div>
+                        )}
                         {isMyEvent && (
                           <button 
                             onClick={(e) => deleteEvent(e, event.id)}
@@ -1894,6 +1912,15 @@ const MainApp = () => {
                       >
                         <span>Подробнее →</span>
                       </a>
+                    )}
+                    {!isMyEvent && (
+                      <button
+                        onClick={() => setSelectedEventChat(event)}
+                        className="mt-3 w-full bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <MessageCircle size={14} />
+                        Присоединиться к чату
+                      </button>
                     )}
                   </div>
                   );
@@ -2859,6 +2886,18 @@ const MainApp = () => {
                     onChange={(e) => setNewEvent({...newEvent, link: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
                     placeholder="https://vk.com/event или https://t.me/event"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Макс. участников</label>
+                  <input 
+                    type="number" 
+                    min="2"
+                    max="1000"
+                    value={newEvent.max_participants}
+                    onChange={(e) => setNewEvent({...newEvent, max_participants: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
+                    placeholder="Без ограничений"
                   />
                 </div>
                 <button 

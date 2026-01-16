@@ -253,7 +253,10 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       
       const { data: events, error } = await supabase
         .from('events')
-        .select('*')
+        .select(`
+          *,
+          participants_count:event_participants(count)
+        `)
         .or(`date.gt.${todayString},and(date.eq.${todayString},time.gt.${currentTime})`) // Только будущие события или сегодня в будущем
         .order('date', { ascending: true })
         .order('time', { ascending: true });
@@ -805,6 +808,111 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           delete typingChannelsRef.current[chatId];
       };
     },
+    // Функции для групповых чатов событий
+    joinEventChat: async (eventId) => {
+      const userId = localStorage.getItem('userId');
+      
+      // Получаем ID чата события
+      const { data: chat } = await supabase
+        .from('event_chats')
+        .select('id')
+        .eq('event_id', eventId)
+        .single();
+      
+      if (!chat) throw new Error('Чат события не найден');
+      
+      // Добавляем пользователя в участники
+      const { error } = await supabase
+        .from('event_participants')
+        .insert([{
+          chat_id: chat.id,
+          user_id: userId
+        }]);
+      
+      if (error) throw error;
+      return chat.id;
+    },
+    
+    leaveEventChat: async (eventId) => {
+      const userId = localStorage.getItem('userId');
+      
+      // Получаем ID чата события
+      const { data: chat } = await supabase
+        .from('event_chats')
+        .select('id')
+        .eq('event_id', eventId)
+        .single();
+      
+      if (!chat) return;
+      
+      // Удаляем пользователя из участников
+      const { error } = await supabase
+        .from('event_participants')
+        .delete()
+        .eq('chat_id', chat.id)
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+    },
+    
+    sendEventMessage: async (chatId, text, type = 'text', imageUrl = null) => {
+      const userId = localStorage.getItem('userId');
+      const { data, error } = await supabase
+        .from('event_messages')
+        .insert([{
+          chat_id: chatId,
+          sender_id: userId,
+          text: text,
+          type: type,
+          image_url: imageUrl
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    
+    getEventChatMessages: async (chatId) => {
+      const { data, error } = await supabase
+        .from('event_messages')
+        .select(`
+          *,
+          sender:sender_id(name, image)
+        `)
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+    
+    getEventChatId: async (eventId) => {
+      const { data, error } = await supabase
+        .from('event_chats')
+        .select('id')
+        .eq('event_id', eventId)
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    },
+    
+    isUserInEventChat: async (eventId) => {
+      const userId = localStorage.getItem('userId');
+      const { data, error } = await supabase
+        .from('event_chats')
+        .select(`
+          id,
+          event_participants!inner(user_id)
+        `)
+        .eq('event_id', eventId)
+        .eq('event_participants.user_id', userId)
+        .single();
+      
+      return !error && data;
+    },
+    
     // Тестовая функция для заполнения базы
     seedDatabase: async () => {
       const demoUsers = [
