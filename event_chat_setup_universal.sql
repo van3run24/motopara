@@ -158,12 +158,17 @@ CREATE POLICY "Users can view messages in joined event chats" ON event_messages
         )
     );
 
-CREATE POLICY "Users can send messages in joined event chats" ON event_messages
-    FOR INSERT WITH CHECK (
-        sender_id = auth.uid() AND
-        EXISTS (
-            SELECT 1 FROM event_participants 
-            WHERE event_participants.chat_id = event_messages.chat_id 
-            AND event_participants.user_id = auth.uid()
-        )
-    );
+-- ============================================
+-- ОЧИСТКА КЭША СХЕМЫ
+-- ============================================
+
+-- Функция для очистки кэша схемы
+CREATE OR REPLACE FUNCTION clear_schema_cache()
+RETURNS void AS $$
+BEGIN
+    NOTIFY pg_stat_reset();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Вызываем функцию после создания всех таблиц
+SELECT clear_schema_cache();
