@@ -3,7 +3,7 @@
 -- Таблица групповых чатов событий
 CREATE TABLE IF NOT EXISTS event_chats (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    event_id UUID REFERENCES events(id) ON DELETE CASCADE, -- Добавляем внешний ключ к events
     name TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -99,11 +99,11 @@ BEGIN
     INSERT INTO event_chats (event_id, name)
     VALUES (NEW.id, 'Чат события: ' || NEW.title);
     
-    -- Автоматически добавляем создателя события в чат
+    -- Автоматически добавляем создателя события в чат и в участники
     INSERT INTO event_participants (chat_id, user_id)
     VALUES (
         (SELECT id FROM event_chats WHERE event_id = NEW.id LIMIT 1),
-        NEW.created_by
+        NEW.created_by_id
     );
     
     RETURN NEW;
