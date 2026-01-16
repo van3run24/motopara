@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Gauge, Music, Shield, Target } from 'lucide-react';
-import { chatService } from '../supabaseService';
 
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
   const [loading, setLoading] = useState(true);
@@ -67,22 +66,21 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .select('*')
         .neq('email', userData.email)
         .eq('city', userData.city)
-        .eq('gender', userData.gender === 'male' ? 'female' : 'male')
-        .order('created_at', { ascending: false }); // Новые пользователи первыми
+        .eq('gender', userData.gender === 'male' ? 'female' : 'male');
       
       if (error) throw error;
       
       // Получаем чаты чтобы исключить уже знакомых
       const { data: chats } = await supabase
         .from('chats')
-        .select('participant_1_id, participant_2_id')
+        .select('*')
         .or(`participant_1_id.eq.${localStorage.getItem('userId')},participant_2_id.eq.${localStorage.getItem('userId')}`);
       
       const matchedIds = chats?.map(chat => 
         chat.participant_1_id === localStorage.getItem('userId') ? chat.participant_2_id : chat.participant_1_id
       ) || [];
       
-      // Получаем лайки/дизлайки одним запросом
+      // Получаем лайки/дизлайки
       const userId = localStorage.getItem('userId');
       const { data: likes } = await supabase
         .from('likes')
@@ -153,45 +151,39 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           participant_1:participant_1_id(name, image, location_updated_at),
           participant_2:participant_2_id(name, image, location_updated_at)
         `)
-        .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
+        .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`);
       
       if (error) throw error;
       
-      // Оптимизированная загрузка сообщений - только последние сообщения для каждого чата
+      // Загружаем сообщения для каждого чата
       const chatsWithMessages = await Promise.all(
         chats.map(async (chat) => {
-          // Загружаем только последнее сообщение для превью
-          const { data: lastMessage } = await supabase
+          const { data: messages } = await supabase
             .from('messages')
             .select('*')
             .eq('chat_id', chat.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .order('created_at', { ascending: true });
           
-          // Считаем непрочитанные сообщения
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('chat_id', chat.id)
-            .eq('is_read', false)
-            .neq('sender_id', userId);
+          console.log(`Loaded ${messages?.length || 0} messages for chat ${chat.id}:`, messages?.map(m => ({id: m.id, sender: m.sender_id, is_read: m.is_read, text: m.text?.substring(0, 30)})));
           
           const partner = chat.participant_1_id === userId ? chat.participant_2 : chat.participant_1;
           const isOnline = partner?.location_updated_at && (new Date() - new Date(partner.location_updated_at) < 15 * 60 * 1000);
 
           return {
             ...chat,
-            messages: [], // Пустой массив, сообщения будут загружаться при открытии чата
+            messages: messages?.map(m => ({
+              ...m,
+              sender: m.sender_id === userId ? 'me' : 'other'
+            })) || [],
             name: partner?.name || 'Неизвестный пользователь',
             image: partner?.image || null,
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
-            lastMessage: lastMessage ? 
-              (lastMessage.type === 'image' ? 'Фотография' : lastMessage.text) || 'Начните общение' : 'Начните общение',
-            time: lastMessage?.created_at ? (() => {
-              const messageDate = new Date(lastMessage.created_at);
+            canSendMessage: true, // Все чаты разрешают отправку сообщений
+            lastMessage: messages?.length > 0 ? 
+              (messages[messages.length - 1]?.type === 'image' ? 'Фотография' : messages[messages.length - 1]?.text) || 'Начните общение' : 'Начните общение',
+            time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? (() => {
+              const messageDate = new Date(messages[messages.length - 1].created_at);
               const now = new Date();
               const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
               const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
@@ -205,15 +197,23 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
                 return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); // Другие даты
               }
             })() : '',
-            unreadCount: unreadCount || 0
+            unreadCount: messages?.filter(m => {
+              const isUnread = m.sender_id !== userId && !m.is_read;
+              if (isUnread) {
+                console.log(`Unread message found: id=${m.id}, sender=${m.sender_id}, is_read=${m.is_read}, text=${m.text?.substring(0, 30)}...`);
+              }
+              return isUnread;
+            }).length || 0
           };
         })
       );
       
       // Сортируем чаты по времени последнего сообщения (новые сверху)
       const sortedChats = chatsWithMessages.sort((a, b) => {
-        const timeA = a.lastMessage ? new Date(a.lastMessage.created_at || 0) : new Date(0);
-        const timeB = b.lastMessage ? new Date(b.lastMessage.created_at || 0) : new Date(0);
+        const timeA = a.messages?.length > 0 && a.messages[a.messages.length - 1]?.created_at ? 
+          new Date(a.messages[a.messages.length - 1].created_at) : new Date(0);
+        const timeB = b.messages?.length > 0 && b.messages[b.messages.length - 1]?.created_at ? 
+          new Date(b.messages[b.messages.length - 1].created_at) : new Date(0);
         return timeB - timeA;
       });
       
@@ -263,9 +263,6 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
   // Загрузка при изменении данных
   useEffect(() => {
     if (userData?.email && localStorage.getItem('userId')) {
-      // Инициализируем storage для чатов
-      chatService.initializeChatStorage();
-      
       loadUsers();
       loadChats();
       loadEvents();
@@ -622,7 +619,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .from('messages')
         .insert([{
           chat_id: chatId,
-          sender_id: type === 'system' ? null : userId, // Для системных сообщений sender_id = null
+          sender_id: userId,
           text: text,
           type: type,
           image: imageUrl
@@ -654,28 +651,8 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .single();
 
       if (mutualLike) {
-        // Мэтч! Проверяем, нет ли уже чата
-        const { data: existingChat } = await supabase
-          .from('chats')
-          .select('*')
-          .or(`and(participant_1_id.eq.${userId},participant_2_id.eq.${targetUserId}),and(participant_1_id.eq.${targetUserId},participant_2_id.eq.${userId})`)
-          .single();
-        
-        let chat;
-        if (!existingChat) {
-          // Создаем новый чат только если его нет
-          chat = await window.supabaseManager.createChat(userId, targetUserId);
-          
-          // Добавляем приветственное сообщение в чат
-          await window.supabaseManager.sendMessage(
-            chat.id, 
-            '🔥 У вас новый мэтч! Начните общение', 
-            'system'
-          );
-        } else {
-          chat = existingChat;
-        }
-        
+        // Мэтч! Создаем чат
+        const chat = await window.supabaseManager.createChat(userId, targetUserId);
         return { isMatch: true, chat };
       }
       
@@ -773,27 +750,6 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     loadUsers,
     loadChats,
     loadEvents,
-    // Загрузка сообщений для конкретного чата
-    loadChatMessages: async (chatId) => {
-      try {
-        const { data: messages, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('chat_id', chatId)
-          .order('created_at', { ascending: true });
-        
-        if (error) throw error;
-        
-        const userId = localStorage.getItem('userId');
-        return messages?.map(m => ({
-          ...m,
-          sender: m.sender_id === userId ? 'me' : 'other'
-        })) || [];
-      } catch (error) {
-        console.error('Error loading chat messages:', error);
-        throw error;
-      }
-    },
     sendTyping: async (chatId) => {
       const userId = localStorage.getItem('userId');
       let channel = typingChannelsRef.current[chatId];

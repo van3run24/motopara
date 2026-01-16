@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
-import UserCard from './UserCard';
 import { supabase } from '../supabaseClient';
 import { userService, compressImage } from '../supabaseService';
 import { cities } from '../data/cities';
@@ -423,14 +422,11 @@ const MainApp = () => {
     return null;
   };
 
-  const getProfileImage = useCallback((user) => {
+  const getProfileImage = (user) => {
     if (user.images && user.images.length > 0) return user.images[0];
     if (user.image) return user.image;
     return DEFAULT_AVATAR;
-  }, []);
-
-  // Мемоизация для изображений галереи
-  const memoizedUserImages = useMemo(() => userImages, [userImages.length]);
+  };
 
   const [selectedImage, setSelectedImage] = useState(null); // Для модального окна просмотра всех фото (чат, галерея, профиль)
   const [imageContext, setImageContext] = useState({ type: null, images: [], currentIndex: 0 }); // Контекст просмотра фото
@@ -792,12 +788,13 @@ const MainApp = () => {
             id: newChat.id,
             name: likedUser.name,
             image: likedUser.images[0] || DEFAULT_AVATAR,
-            lastMessage: 'Новый мэтч!',
+            lastMessage: 'Это мэтч! Начните общение первым',
             time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
             online: true,
-            unreadCount: 1,
+            unreadCount: 0,
             messages: [],
-            partnerId: likedUser.id
+            partnerId: likedUser.id,
+            canSendMessage: true // Оба участника могут писать
           };
           setChats(prev => [...prev, chatData]);
           
@@ -1121,14 +1118,16 @@ const MainApp = () => {
         } else {
             // Chat images (support multiple)
             const files = Array.from(e.target.files);
+            console.log(`Processing ${files.length} chat images...`);
+            
             for (const file of files) {
                 try {
-                    console.log('Uploading chat image:', file.name);
-                    console.log('Original chat file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
+                    console.log('Processing chat image:', file.name);
+                    console.log('Original file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
                     
-                    // Сжимаем изображение перед загрузкой в чат
-                    const compressedFile = await compressImage(file, 1200, 1200, 0.8);
-                    console.log('Compressed chat file size:', (compressedFile.size / 1024 / 1024).toFixed(2) + ' MB');
+                    // Сжимаем изображение для чата
+                    const compressedFile = await compressImage(file, 800, 800, 0.7);
+                    console.log('Compressed file size:', (compressedFile.size / 1024 / 1024).toFixed(2) + ' MB');
                     
                     const fileExt = 'jpg'; // Всегда сохраняем как JPG после сжатия
                     const fileName = `${userId}/chat/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
@@ -1141,7 +1140,7 @@ const MainApp = () => {
                         });
 
                     if (uploadError) {
-                        console.error('Chat image upload error:', uploadError);
+                        console.error('Error uploading chat image:', uploadError);
                         throw uploadError;
                     }
 
@@ -1156,12 +1155,11 @@ const MainApp = () => {
                         console.log('Chat image message sent successfully');
                     } else {
                         console.error('No selected chat or supabaseManager available');
-                        throw new Error('Чат не выбран');
                     }
-                } catch (fileError) {
-                    console.error('Error processing chat image:', fileError);
-                    setError('Ошибка загрузки фото: ' + fileError.message);
-                    alert('Ошибка загрузки фото: ' + fileError.message);
+                } catch (imageError) {
+                    console.error('Error processing chat image:', imageError);
+                    setError('Ошибка загрузки фото в чат: ' + imageError.message);
+                    // Продолжаем обработку других файлов даже если один не удался
                 }
             }
         }
@@ -1366,6 +1364,14 @@ const MainApp = () => {
   const sendMessage = async () => {
     if (!messageInput.trim() || !selectedChat) return;
 
+    // Проверяем, можно ли отправлять сообщения в этом чате
+    // Для мэтчей оба участника могут писать, для других чатов тоже разрешаем
+    const canSend = selectedChat.canSendMessage !== false;
+    if (!canSend) {
+      setError('Нельзя отправлять сообщения в этом чате');
+      return;
+    }
+
     try {
       // Send new message
       if (window.supabaseManager) {
@@ -1392,26 +1398,6 @@ const MainApp = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedChat?.messages]);
-
-  // Загрузка сообщений при открытии чата
-  useEffect(() => {
-    const loadChatMessages = async () => {
-      if (selectedChat && (!selectedChat.messages || selectedChat.messages.length === 0)) {
-        try {
-          console.log('Loading messages for chat:', selectedChat.id);
-          const messages = await window.supabaseManager.loadChatMessages(selectedChat.id);
-          setSelectedChat(prev => ({
-            ...prev,
-            messages
-          }));
-        } catch (error) {
-          console.error('Error loading chat messages:', error);
-        }
-      }
-    };
-
-    loadChatMessages();
-  }, [selectedChat?.id]); // Загружаем только при изменении ID чата
 
   // Sync selectedChat with chats updates (real-time)
   useEffect(() => {
@@ -1532,18 +1518,88 @@ const MainApp = () => {
                   onMouseUp={handleMouseUp}
                   onMouseLeave={handleMouseUp}
                 >
-                  <UserCard
-                    user={currentBiker}
-                    onLike={handleLike}
-                    onDislike={handleDislike}
-                    onImageClick={(images, index) => {
-                      setSelectedImage(images[index]);
-                      setImageContext({ type: 'biker', images, currentIndex: index });
-                    }}
-                    setCurrentImageIndex={setCurrentImageIndex}
-                    currentImageIndex={currentImageIndex}
-                    getProfileImage={getProfileImage}
-                  />
+                  {/* Внутренний контейнер с прокруткой */}
+                  <div 
+                    ref={profileScrollRef}
+                    className="h-full flex flex-col overflow-y-auto"
+                  >
+                    {/* Изображение на весь окошко */}
+                    <div 
+                      className="relative w-full h-full shrink-0"
+                      style={{ minHeight: '100%' }}
+                      onClick={switchImage}
+                    >
+                      <img 
+                        src={currentBiker.images[currentImageIndex] || currentBiker.images[0] || DEFAULT_AVATAR} 
+                        className="absolute inset-0 w-full h-full object-cover z-10" 
+                        alt="Biker" 
+                        onError={(e) => {
+                          e.target.src = DEFAULT_AVATAR;
+                        }}
+                      />
+
+                      {/* Полоски индикатора изображений */}
+                      <div className="absolute top-6 left-6 right-6 flex gap-1.5 z-30 pointer-events-none">
+                        {currentBiker.images && currentBiker.images.length > 0 ? currentBiker.images.map((_, i) => (
+                          <div key={i} className={`h-1 flex-1 rounded-full transition-all backdrop-blur-sm ${i === currentImageIndex ? 'bg-orange-500' : 'bg-white/30'}`} />
+                        )) : null}
+                      </div>
+
+                      {/* Затемнение внизу для читаемости */}
+                      <div
+                        className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none"
+                        style={{ height: '45%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0) 100%)' }}
+                      />
+
+                      {/* Имя, возраст и байк внизу */}
+                      <div className="absolute bottom-6 left-6 right-6 z-30 pointer-events-none">
+                        <h3 className="text-4xl font-black tracking-tight uppercase italic text-white drop-shadow-2xl mb-2">{currentBiker.name}, {currentBiker.age}</h3>
+                        <div className="flex items-center gap-2">
+                          <Zap size={16} className="text-orange-500 fill-orange-500 drop-shadow-2xl" />
+                          <p className="text-orange-500 text-sm font-bold uppercase tracking-widest drop-shadow-2xl">{currentBiker.has_bike ? currentBiker.bike : "Ищу того, кто прокатит"}</p>
+                        </div>
+                      </div>
+
+
+                      {/* Индикаторы свайпа влево/вправо */}
+                      {isDragging && Math.abs(dragOffset.x) > 50 && (
+                        <div className={`absolute top-1/2 -translate-y-1/2 z-40 pointer-events-none ${
+                          dragOffset.x > 0 ? 'right-8' : 'left-8'
+                        }`}>
+                          <div className={`p-4 rounded-2xl backdrop-blur-xl ${
+                            dragOffset.x > 0 
+                              ? 'bg-green-500/20 border border-green-400/30' 
+                              : 'bg-red-500/20 border border-red-400/30'
+                          }`}>
+                            {dragOffset.x > 0 ? (
+                              <Heart size={32} className="text-green-400 fill-green-400" />
+                            ) : (
+                              <X size={32} className="text-red-400" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Описание (появляется при скролле) */}
+                    <div className="bg-black/80 backdrop-blur-3xl border-t border-white/10 shrink-0 transition-all duration-500 ease-in-out">
+                      <div className="p-8 space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xl font-black uppercase italic text-white">О себе</h4>
+                        </div>
+                        <p className="text-lg text-zinc-200 leading-relaxed font-light italic">"{currentBiker.about || 'Пользователь не указал информацию о себе'}"</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {currentBiker.interests && currentBiker.interests.map((item, idx) => (
+                            <div key={idx} className="bg-white/[0.05] backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col gap-1">
+                              <div className="text-zinc-300 flex items-center gap-2 mb-1">{item.icon}<span className="text-[9px] uppercase font-bold tracking-tighter">{item.label}</span></div>
+                              <span className="text-sm font-semibold text-white/90">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="h-16 transition-all duration-300 ease-in-out" />
+                      </div>
+                    </div>
+                  </div>
                 </article>
 
                 {/* Панель действий под окошком */}
@@ -1555,7 +1611,7 @@ const MainApp = () => {
                     <X size={28} className="text-white/90" />
                   </button>
                   <button 
-                    onClick={(e) => { e.stopPropagation(); handleLike(); }}
+                    onClick={(e) => { e.stopPropagation(); handleLike(); }} 
                     className="w-20 h-20 rounded-full bg-gradient-to-r from-red-500 to-orange-500 flex items-center justify-center shadow-2xl active:scale-90 hover:scale-105 transition-all relative z-50"
                   >
                     <Heart fill="white" size={36} className="text-white" />
@@ -2071,19 +2127,6 @@ const MainApp = () => {
                 }
                 
                 const msg = item;
-                
-                // Системные сообщения (например, о новом мэтче)
-                if (msg.type === 'system') {
-                  return (
-                    <div key={msg.id || idx} className="flex justify-center my-4">
-                      <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 px-4 py-2 rounded-full text-center">
-                        <p className="text-orange-400 text-sm font-medium">{msg.text}</p>
-                        <span className="text-orange-500/60 text-xs">{formatMessageTime(msg.created_at)}</span>
-                      </div>
-                    </div>
-                  );
-                }
-                
                 return (
                   <div 
                       key={msg.id || idx} 

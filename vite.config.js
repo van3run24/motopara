@@ -5,9 +5,4 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: "/",
-  esbuild: {
-    // Упрощаем ESBuild для решения проблем с WebAssembly
-    target: 'es2015',
-    minify: false,
-  },
 })
