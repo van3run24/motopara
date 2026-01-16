@@ -2488,21 +2488,9 @@ const MainApp = () => {
                   const currentUserId = localStorage.getItem('userId');
                   const isOwnMessage = msg.sender_id === currentUserId;
                   
-                  // Показываем имя для всех входящих сообщений
-                  const showName = !isOwnMessage;
-                  
                   return (
                     <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
                       <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
-                        {/* Имя отправителя для входящих сообщений */}
-                        {!isOwnMessage && showName && (
-                          <div className="px-9 pb-1">
-                            <span className="text-xs font-bold text-orange-500 uppercase">
-                              {msg.sender?.name || 'Пользователь'}
-                            </span>
-                          </div>
-                        )}
-                        
                         <div className={`group relative flex items-end gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                           {/* Аватарка для входящих сообщений */}
                           {!isOwnMessage && (
@@ -2532,6 +2520,13 @@ const MainApp = () => {
                               ? 'bg-orange-600 text-white rounded-br-md' 
                               : 'bg-white/10 text-white rounded-bl-md'
                           }`}>
+                            {/* Имя отправителя внутри сообщения */}
+                            {!isOwnMessage && (
+                              <div className="text-xs font-bold text-orange-500 uppercase mb-1">
+                                {msg.sender?.name || 'Пользователь'}
+                              </div>
+                            )}
+                            
                             {msg.type === 'text' && (
                               <p className="text-sm leading-relaxed break-words">{msg.text}</p>
                             )}
