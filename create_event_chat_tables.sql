@@ -96,6 +96,7 @@ ALTER TABLE event_messages ENABLE ROW LEVEL SECURITY;
 
 -- Удаляем существующие политики если есть
 DROP POLICY IF EXISTS "Users can view messages in joined event chats" ON event_messages;
+DROP POLICY IF EXISTS "Users can send messages in joined event chats" ON event_messages;
 
 CREATE POLICY "Users can view messages in joined event chats" ON event_messages
     FOR SELECT USING (
