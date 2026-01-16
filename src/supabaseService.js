@@ -505,14 +505,6 @@ export const groupChatService = {
       .from('group_chats')
       .select(`
         *,
-        event!group_chats_event_id_fkey(
-          id,
-          title,
-          description,
-          date,
-          time,
-          address
-        ),
         group_chat_participants(
           user_id,
           joined_at,
