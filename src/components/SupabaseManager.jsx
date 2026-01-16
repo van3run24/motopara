@@ -67,21 +67,22 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .select('*')
         .neq('email', userData.email)
         .eq('city', userData.city)
-        .eq('gender', userData.gender === 'male' ? 'female' : 'male');
+        .eq('gender', userData.gender === 'male' ? 'female' : 'male')
+        .order('created_at', { ascending: false }); // Новые пользователи первыми
       
       if (error) throw error;
       
       // Получаем чаты чтобы исключить уже знакомых
       const { data: chats } = await supabase
         .from('chats')
-        .select('*')
+        .select('participant_1_id, participant_2_id')
         .or(`participant_1_id.eq.${localStorage.getItem('userId')},participant_2_id.eq.${localStorage.getItem('userId')}`);
       
       const matchedIds = chats?.map(chat => 
         chat.participant_1_id === localStorage.getItem('userId') ? chat.participant_2_id : chat.participant_1_id
       ) || [];
       
-      // Получаем лайки/дизлайки
+      // Получаем лайки/дизлайки одним запросом
       const userId = localStorage.getItem('userId');
       const { data: likes } = await supabase
         .from('likes')
@@ -152,38 +153,45 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           participant_1:participant_1_id(name, image, location_updated_at),
           participant_2:participant_2_id(name, image, location_updated_at)
         `)
-        .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`);
+        .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      // Загружаем сообщения для каждого чата
+      // Оптимизированная загрузка сообщений - только последние сообщения для каждого чата
       const chatsWithMessages = await Promise.all(
         chats.map(async (chat) => {
-          const { data: messages } = await supabase
+          // Загружаем только последнее сообщение для превью
+          const { data: lastMessage } = await supabase
             .from('messages')
             .select('*')
             .eq('chat_id', chat.id)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
           
-          console.log(`Loaded ${messages?.length || 0} messages for chat ${chat.id}:`, messages?.map(m => ({id: m.id, sender: m.sender_id, is_read: m.is_read, text: m.text?.substring(0, 30)})));
+          // Считаем непрочитанные сообщения
+          const { count: unreadCount } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('chat_id', chat.id)
+            .eq('is_read', false)
+            .neq('sender_id', userId);
           
           const partner = chat.participant_1_id === userId ? chat.participant_2 : chat.participant_1;
           const isOnline = partner?.location_updated_at && (new Date() - new Date(partner.location_updated_at) < 15 * 60 * 1000);
 
           return {
             ...chat,
-            messages: messages?.map(m => ({
-              ...m,
-              sender: m.sender_id === userId ? 'me' : 'other'
-            })) || [],
+            messages: [], // Пустой массив, сообщения будут загружаться при открытии чата
             name: partner?.name || 'Неизвестный пользователь',
             image: partner?.image || null,
             online: isOnline,
             partnerId: partner ? (chat.participant_1_id === userId ? chat.participant_2_id : chat.participant_1_id) : null,
-            lastMessage: messages?.length > 0 ? 
-              (messages[messages.length - 1]?.type === 'image' ? 'Фотография' : messages[messages.length - 1]?.text) || 'Начните общение' : 'Начните общение',
-            time: messages?.length > 0 && messages[messages.length - 1]?.created_at ? (() => {
-              const messageDate = new Date(messages[messages.length - 1].created_at);
+            lastMessage: lastMessage ? 
+              (lastMessage.type === 'image' ? 'Фотография' : lastMessage.text) || 'Начните общение' : 'Начните общение',
+            time: lastMessage?.created_at ? (() => {
+              const messageDate = new Date(lastMessage.created_at);
               const now = new Date();
               const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
               const messageDay = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
@@ -197,23 +205,15 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
                 return messageDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); // Другие даты
               }
             })() : '',
-            unreadCount: messages?.filter(m => {
-              const isUnread = m.sender_id !== userId && !m.is_read;
-              if (isUnread) {
-                console.log(`Unread message found: id=${m.id}, sender=${m.sender_id}, is_read=${m.is_read}, text=${m.text?.substring(0, 30)}...`);
-              }
-              return isUnread;
-            }).length || 0
+            unreadCount: unreadCount || 0
           };
         })
       );
       
       // Сортируем чаты по времени последнего сообщения (новые сверху)
       const sortedChats = chatsWithMessages.sort((a, b) => {
-        const timeA = a.messages?.length > 0 && a.messages[a.messages.length - 1]?.created_at ? 
-          new Date(a.messages[a.messages.length - 1].created_at) : new Date(0);
-        const timeB = b.messages?.length > 0 && b.messages[b.messages.length - 1]?.created_at ? 
-          new Date(b.messages[b.messages.length - 1].created_at) : new Date(0);
+        const timeA = a.lastMessage ? new Date(a.lastMessage.created_at || 0) : new Date(0);
+        const timeB = b.lastMessage ? new Date(b.lastMessage.created_at || 0) : new Date(0);
         return timeB - timeA;
       });
       
@@ -773,6 +773,27 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     loadUsers,
     loadChats,
     loadEvents,
+    // Загрузка сообщений для конкретного чата
+    loadChatMessages: async (chatId) => {
+      try {
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', { ascending: true });
+        
+        if (error) throw error;
+        
+        const userId = localStorage.getItem('userId');
+        return messages?.map(m => ({
+          ...m,
+          sender: m.sender_id === userId ? 'me' : 'other'
+        })) || [];
+      } catch (error) {
+        console.error('Error loading chat messages:', error);
+        throw error;
+      }
+    },
     sendTyping: async (chatId) => {
       const userId = localStorage.getItem('userId');
       let channel = typingChannelsRef.current[chatId];
