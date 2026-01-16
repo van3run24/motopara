@@ -2495,53 +2495,6 @@ const MainApp = () => {
                   return (
                     <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
                       <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
-                        {/* Показываем имя и фото для чужих сообщений */}
-                        {!isOwnMessage && (
-                          <>
-                            {showName && (
-                              <div className="px-3 pb-1">
-                                <button
-                                  onClick={() => {
-                                    const sender = msg.sender;
-                                    if (sender) {
-                                      // Находим полные данные пользователя в bikers
-                                      const fullUserData = bikers.find(b => b.id === sender.id);
-                                      if (fullUserData) {
-                                        setMatchData(fullUserData);
-                                        setViewingProfile(true);
-                                      }
-                                    }
-                                  }}
-                                  className="text-xs font-bold text-orange-500 uppercase hover:text-orange-400 transition-colors"
-                                >
-                                  {msg.sender?.name || 'Пользователь'}
-                                </button>
-                              </div>
-                            )}
-                            <div className="flex items-end gap-2">
-                              <button
-                                onClick={() => {
-                                  const sender = msg.sender;
-                                  if (sender) {
-                                    // Находим полные данные пользователя в bikers
-                                    const fullUserData = bikers.find(b => b.id === sender.id);
-                                    if (fullUserData) {
-                                      setMatchData(fullUserData);
-                                      setViewingProfile(true);
-                                    }
-                                  }
-                                }}
-                                className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0"
-                              >
-                                {msg.sender?.image ? (
-                                  <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
-                                ) : (
-                                  <User size={12} className="text-white" />
-                                )}
-                              </button>
-                            </div>
-                          </>
-                        )}
                         <div className={`group relative px-4 py-2 rounded-2xl ${
                           isOwnMessage 
                             ? 'bg-orange-600 text-white rounded-br-md' 
@@ -2574,6 +2527,48 @@ const MainApp = () => {
                               </span>
                             )}
                           </div>
+                          
+                          {/* Аватарка и имя отправителя в левом нижнем углу */}
+                          <div className="absolute bottom-0 left-0 flex items-center gap-1 translate-y-1/2">
+                            <button
+                              onClick={() => {
+                                if (isOwnMessage) {
+                                  // Для своих сообщений открываем свой профиль
+                                  setViewingProfile(true);
+                                } else {
+                                  // Для чужих сообщений ищем данные пользователя
+                                  const sender = msg.sender;
+                                  if (sender) {
+                                    const fullUserData = bikers.find(b => b.id === sender.id);
+                                    if (fullUserData) {
+                                      setMatchData(fullUserData);
+                                      setViewingProfile(true);
+                                    }
+                                  }
+                                }
+                              }}
+                              className="w-5 h-5 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
+                            >
+                              {isOwnMessage ? (
+                                userData?.image ? (
+                                  <img src={userData.image} alt={userData.name} className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <User size={10} className="text-white" />
+                                )
+                              ) : (
+                                msg.sender?.image ? (
+                                  <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <User size={10} className="text-white" />
+                                )
+                              )}
+                            </button>
+                            {!isOwnMessage && showName && (
+                              <span className="text-[10px] font-bold text-orange-500 uppercase whitespace-nowrap">
+                                {msg.sender?.name || 'Пользователь'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2593,7 +2588,19 @@ const MainApp = () => {
                   <h5 className="text-xs font-bold text-zinc-400 uppercase mb-3">Участники чата</h5>
                   <div className="space-y-2">
                     {selectedGroupChat.group_chat_participants.map((participant) => (
-                      <div key={participant.user_id} className="flex items-center gap-3 p-2 bg-white/5 rounded-lg">
+                      <button
+                        key={participant.user_id}
+                        onClick={() => {
+                          if (participant.user) {
+                            const fullUserData = bikers.find(b => b.id === participant.user.id);
+                            if (fullUserData) {
+                              setMatchData(fullUserData);
+                              setViewingProfile(true);
+                            }
+                          }
+                        }}
+                        className="flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors w-full text-left"
+                      >
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center">
                           {participant.user?.image ? (
                             <img src={participant.user.image} alt={participant.user.name} className="w-full h-full rounded-full object-cover" />
@@ -2604,7 +2611,7 @@ const MainApp = () => {
                         <span className="text-sm text-white font-medium">
                           {participant.user?.name || 'Пользователь'}
                         </span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
