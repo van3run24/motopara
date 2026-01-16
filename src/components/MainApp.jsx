@@ -2498,7 +2498,11 @@ const MainApp = () => {
                               onClick={() => {
                                 const sender = msg.sender;
                                 if (sender) {
-                                  const fullUserData = bikers.find(b => b.id === sender.id);
+                                  // Сначала ищем в bikers, если нет - используем данные из sender
+                                  const fullUserData = bikers.find(b => b.id === sender.id) || {
+                                    ...sender,
+                                    images: sender.images || [sender.image].filter(Boolean)
+                                  };
                                   if (fullUserData) {
                                     setMatchData(fullUserData);
                                     setViewingProfile(true);
@@ -2526,7 +2530,11 @@ const MainApp = () => {
                                 onClick={() => {
                                   const sender = msg.sender;
                                   if (sender) {
-                                    const fullUserData = bikers.find(b => b.id === sender.id);
+                                    // Сначала ищем в bikers, если нет - используем данные из sender
+                                    const fullUserData = bikers.find(b => b.id === sender.id) || {
+                                      ...sender,
+                                      images: sender.images || [sender.image].filter(Boolean)
+                                    };
                                     if (fullUserData) {
                                       setMatchData(fullUserData);
                                       setViewingProfile(true);
@@ -3413,7 +3421,11 @@ const MainApp = () => {
                     <button
                       onClick={() => {
                         if (participant.user) {
-                          const fullUserData = bikers.find(b => b.id === participant.user.id);
+                          // Сначала ищем в bikers, если нет - используем данные из participant.user
+                          const fullUserData = bikers.find(b => b.id === participant.user.id) || {
+                            ...participant.user,
+                            images: participant.user.images || [participant.user.image].filter(Boolean)
+                          };
                           if (fullUserData) {
                             setMatchData(fullUserData);
                             setViewingProfile(true);
