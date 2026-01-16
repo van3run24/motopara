@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Heart, MapPin, MessageCircle, User, X, Gauge, Music, Shield, Target, Edit3, Settings, LogOut, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Send, Camera, Navigation, Zap, Trash2, Ban, Image as ImageIcon, Plus, Calendar, Clock, MapPin as MapPinIcon, Smile, Database, Loader2, Check, CheckCheck, Info, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import SupabaseManager from './SupabaseManager';
-import EventGroupChat from './EventGroupChat';
 import { supabase } from '../supabaseClient';
-import { userService, compressImage } from '../supabaseService';
+import { userService, compressImage, groupChatService } from '../supabaseService';
 import { cities } from '../data/cities';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -614,7 +613,6 @@ const MainApp = () => {
   const [swipedChatId, setSwipedChatId] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [viewingProfile, setViewingProfile] = useState(null);
-  const [selectedEventChat, setSelectedEventChat] = useState(null); // Для группового чата события
   
   // Settings States
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -627,8 +625,13 @@ const MainApp = () => {
   const [bikers, setBikers] = useState([]);
   const [chats, setChats] = useState([]);
   const [newMatches, setNewMatches] = useState([]);
+  
+  // Состояния для групповых чатов
+  const [selectedGroupChat, setSelectedGroupChat] = useState(null);
+  const [groupChatMessageInput, setGroupChatMessageInput] = useState('');
+  const [showGroupChatEmojiPicker, setShowGroupChatEmojiPicker] = useState(false);
 
-  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '', max_participants: '' });
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
   const fileInputRef = useRef(null);
   const profileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -1194,7 +1197,6 @@ const MainApp = () => {
           time: newEvent.time,
           address: newEvent.address,
           link: newEvent.link,
-          ...(newEvent.max_participants && { max_participants: parseInt(newEvent.max_participants) }),
           created_by_id: userId,
           created_at: new Date().toISOString()
         };
@@ -1215,6 +1217,96 @@ const MainApp = () => {
         console.error('Error creating event:', err);
         alert('Ошибка при создании события: ' + err.message);
       }
+    }
+  };
+
+  // Функции для групповых чатов
+  const joinGroupChat = async (groupChatId) => {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        alert('Ошибка: Пользователь не найден');
+        return;
+      }
+
+      // Проверяем, не состоит ли пользователь уже в чате
+      const existingParticipant = await groupChatService.isUserInGroupChat(groupChatId, userId);
+      if (existingParticipant) {
+        alert('Вы уже состоите в этом чате');
+        return;
+      }
+
+      // Присоединяемся к чату
+      await groupChatService.joinGroupChat(groupChatId, userId);
+      
+      // Загружаем информацию о групповом чате
+      const groupChatData = await groupChatService.getGroupChat(groupChatId);
+      setSelectedGroupChat(groupChatData);
+      
+      alert('Вы присоединились к чату события!');
+    } catch (err) {
+      console.error('Error joining group chat:', err);
+      alert('Ошибка при присоединении к чату: ' + err.message);
+    }
+  };
+
+  const sendGroupMessage = async () => {
+    if (!groupChatMessageInput.trim() || !selectedGroupChat) return;
+
+    try {
+      const userId = localStorage.getItem('userId');
+      const messageData = {
+        sender_id: userId,
+        text: groupChatMessageInput.trim(),
+        type: 'text'
+      };
+
+      const message = await groupChatService.sendGroupMessage(selectedGroupChat.id, messageData);
+      
+      // Добавляем сообщение в локальное состояние
+      setSelectedGroupChat(prev => ({
+        ...prev,
+        messages: [...(prev.messages || []), message]
+      }));
+
+      setGroupChatMessageInput('');
+    } catch (err) {
+      console.error('Error sending group message:', err);
+      alert('Ошибка отправки сообщения: ' + err.message);
+    }
+  };
+
+  const openGroupChat = async (event) => {
+    if (!event.group_chat_id) {
+      alert('Чат для этого события еще не создан');
+      return;
+    }
+
+    try {
+      const userId = localStorage.getItem('userId');
+      
+      // Проверяем, состоит ли пользователь в чате
+      const isParticipant = await groupChatService.isUserInGroupChat(event.group_chat_id, userId);
+      
+      if (!isParticipant) {
+        // Если пользователь не в чате, показываем подтверждение
+        if (!confirm('Хотите присоединиться к чату этого события?')) {
+          return;
+        }
+        await joinGroupChat(event.group_chat_id);
+      } else {
+        // Если пользователь уже в чате, загружаем данные чата
+        const groupChatData = await groupChatService.getGroupChat(event.group_chat_id);
+        const messages = await groupChatService.getGroupChatMessages(event.group_chat_id);
+        
+        setSelectedGroupChat({
+          ...groupChatData,
+          messages: messages
+        });
+      }
+    } catch (err) {
+      console.error('Error opening group chat:', err);
+      alert('Ошибка открытия чата: ' + err.message);
     }
   };
 
@@ -1451,18 +1543,8 @@ const MainApp = () => {
   return (
     <div className="fixed top-0 left-0 w-full h-full supports-[height:100dvh]:h-[100dvh] bg-black text-white flex flex-col overflow-hidden font-sans animate-in fade-in duration-500">
       
-      {/* Event Group Chat */}
-      {selectedEventChat && (
-        <EventGroupChat
-          eventId={selectedEventChat.id}
-          eventName={selectedEventChat.title}
-          onBack={() => setSelectedEventChat(null)}
-          userData={userData}
-        />
-      )}
-      
       {/* Supabase Manager - работает в фоне */}
-      {userData && !selectedEventChat && (
+      {userData && (
         <SupabaseManager 
           userData={userData}
           onUsersLoaded={setBikers}
@@ -1471,7 +1553,7 @@ const MainApp = () => {
         />
       )}
       
-      {!selectedEventChat && !selectedChat && !viewingProfile && (
+      {!selectedChat && !viewingProfile && (
         <header className="h-16 shrink-0 backdrop-blur-xl bg-black/50 border-b border-white/5 flex items-center justify-between px-6 z-40">
           <div className="text-lg font-black tracking-tighter italic uppercase">Мото<span className="text-orange-500">Знакомства</span></div>
           <button onClick={() => {setActiveTab('profile');}} className={`w-9 h-9 rounded-full border transition-all flex items-center justify-center overflow-hidden ${activeTab === 'profile' ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 bg-white/5'}`}>
@@ -1814,8 +1896,8 @@ const MainApp = () => {
               )}
             </div>
 
-            {/* СЕКЦИЯ СОБЫТИЙ - только не в полноэкранном режиме и не в групповом чате */}
-            {!isMapFullscreen && !selectedEventChat && (
+            {/* СЕКЦИЯ СОБЫТИЙ - только не в полноэкранном режиме */}
+            {!isMapFullscreen && (
               <div className="px-4 mt-6 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">События в вашем городе</h3>
@@ -1834,11 +1916,6 @@ const MainApp = () => {
                     <div key={event.id} className="bg-white/3 border border-white/5 rounded-[24px] p-5 relative group">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-bold text-sm uppercase italic flex-1 pr-6">{event.title}</h4>
-                        {event.max_participants && (
-                          <div className="text-xs text-zinc-500 bg-white/5 px-2 py-1 rounded-full">
-                            {event.participants_count || 0}/{event.max_participants}
-                          </div>
-                        )}
                         {isMyEvent && (
                           <button 
                             onClick={(e) => deleteEvent(e, event.id)}
@@ -1913,13 +1990,14 @@ const MainApp = () => {
                         <span>Подробнее →</span>
                       </a>
                     )}
-                    {!isMyEvent && (
-                      <button
-                        onClick={() => setSelectedEventChat(event)}
-                        className="mt-3 w-full bg-orange-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-orange-500 transition-colors flex items-center justify-center gap-2"
+                    {/* Кнопка присоединения к групповому чату */}
+                    {event.group_chat_id && (
+                      <button 
+                        onClick={() => openGroupChat(event)}
+                        className="mt-3 w-full bg-orange-600 hover:bg-orange-700 text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl transition-all flex items-center justify-center gap-2"
                       >
                         <MessageCircle size={14} />
-                        Присоединиться к чату
+                        <span>Присоединиться к чату</span>
                       </button>
                     )}
                   </div>
@@ -2312,6 +2390,129 @@ const MainApp = () => {
               >
                 <Send size={16} />
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ОКНО ГРУППОВОГО ЧАТА */}
+        {selectedGroupChat && (
+          <div className="absolute inset-0 bg-black z-50 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="h-20 shrink-0 border-b border-white/5 flex items-center px-6 gap-4 bg-black/80 backdrop-blur-xl">
+              <button onClick={() => { setSelectedGroupChat(null); setGroupChatMessageInput(''); }} className="p-2 bg-white/5 rounded-xl active:scale-90 transition-all"><ChevronLeft size={20}/></button>
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center">
+                  <MessageCircle size={18} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-sm uppercase italic">{selectedGroupChat.name || 'Чат события'}</h4>
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase">
+                    {selectedGroupChat.group_chat_participants?.length || 0} участников
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 flex flex-col scrollbar-hide">
+              {selectedGroupChat.messages && selectedGroupChat.messages.length > 0 ? (
+                <>
+                {groupMessagesByDate(selectedGroupChat.messages).map((item, idx) => {
+                  if (item.type === 'separator') {
+                    return (
+                      <div key={`sep-${idx}`} className="flex items-center justify-center my-4">
+                        <div className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-xs font-medium">
+                          {item.date}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  const msg = item;
+                  const currentUserId = localStorage.getItem('userId');
+                  const isOwnMessage = msg.sender_id === currentUserId;
+                  
+                  // Проверяем, нужно ли показывать имя (как в Telegram)
+                  const showName = idx === 0 || 
+                    selectedGroupChat.messages[idx - 1]?.sender_id !== msg.sender_id;
+                  
+                  return (
+                    <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
+                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                        {/* Показываем имя только для чужих сообщений и если это первое сообщение от этого пользователя */}
+                        {!isOwnMessage && showName && (
+                          <div className="px-3 pb-1">
+                            <span className="text-xs font-bold text-orange-500 uppercase">
+                              {msg.sender?.name || 'Пользователь'}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`group relative px-4 py-2 rounded-2xl ${
+                          isOwnMessage 
+                            ? 'bg-orange-600 text-white rounded-br-md' 
+                            : 'bg-white/10 text-white rounded-bl-md'
+                        }`}>
+                          {msg.type === 'text' && (
+                            <p className="text-sm leading-relaxed break-words">{msg.text}</p>
+                          )}
+                          {msg.type === 'image' && (
+                            <img 
+                              src={msg.image} 
+                              alt="Message image" 
+                              className="rounded-xl max-w-full cursor-pointer active:scale-95 transition-transform"
+                              onClick={() => {
+                                setSelectedImage(msg.image);
+                                const chatImages = selectedGroupChat?.messages?.filter(m => m.type === 'image').map(m => m.image) || [];
+                                const currentIndex = chatImages.indexOf(msg.image);
+                                setImageContext({ type: 'chat', images: chatImages, currentIndex });
+                              }}
+                              loading="lazy"
+                            />
+                          )}
+                          <div className={`flex items-center gap-1 mt-1 text-xs ${
+                            isOwnMessage ? 'text-orange-200' : 'text-zinc-500'
+                          }`}>
+                            <span>{formatMessageTime(msg.created_at)}</span>
+                            {isOwnMessage && (
+                              <span className="ml-1">
+                                {msg.read ? <CheckCheck size={12} /> : <Check size={12} />}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-zinc-500 text-sm">Нет сообщений. Начните общение первым!</p>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            <div className="shrink-0 border-t border-white/5 p-4 bg-black/80 backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={groupChatMessageInput}
+                  onChange={(e) => setGroupChatMessageInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendGroupMessage()}
+                  placeholder="Сообщение в чате события..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-[18px] px-4 py-2 text-sm outline-none focus:border-orange-500/50 transition-colors resize-none min-h-[36px] max-h-32 leading-relaxed" 
+                />
+                <button 
+                  onClick={() => setShowGroupChatEmojiPicker(!showGroupChatEmojiPicker)}
+                  className="bg-white/5 w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-zinc-400 active:scale-95 transition-all relative"
+                >
+                  <Smile size={18} />
+                </button>
+                <button 
+                  onClick={sendGroupMessage}
+                  disabled={!groupChatMessageInput.trim()}
+                  className="bg-orange-600 w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2886,18 +3087,6 @@ const MainApp = () => {
                     onChange={(e) => setNewEvent({...newEvent, link: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
                     placeholder="https://vk.com/event или https://t.me/event"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-zinc-500 mb-1.5 ml-1 uppercase tracking-widest">Макс. участников</label>
-                  <input 
-                    type="number" 
-                    min="2"
-                    max="1000"
-                    value={newEvent.max_participants}
-                    onChange={(e) => setNewEvent({...newEvent, max_participants: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm outline-none focus:border-orange-500"
-                    placeholder="Без ограничений"
                   />
                 </div>
                 <button 

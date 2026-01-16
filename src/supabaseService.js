@@ -246,16 +246,48 @@ export const chatService = {
 export const eventService = {
   // Создание события
   async createEvent(eventData) {
+    // Сначала создаем групповой чат для события
+    const { data: groupChat, error: chatError } = await supabase
+      .from('group_chats')
+      .insert([{
+        event_id: null, // временно null, обновим после создания события
+        name: eventData.title,
+        created_by_id: eventData.created_by_id,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+    
+    if (chatError) throw chatError;
+    
+    // Добавляем создателя в участники чата
+    await supabase
+      .from('group_chat_participants')
+      .insert([{
+        group_chat_id: groupChat.id,
+        user_id: eventData.created_by_id,
+        joined_at: new Date().toISOString()
+      }]);
+    
+    // Создаем событие с привязкой к групповому чату
     const { data, error } = await supabase
       .from('events')
       .insert([{
         ...eventData,
+        group_chat_id: groupChat.id,
         created_at: new Date().toISOString()
       }])
       .select()
       .single();
     
     if (error) throw error;
+    
+    // Обновляем event_id в групповом чате
+    await supabase
+      .from('group_chats')
+      .update({ event_id: data.id })
+      .eq('id', groupChat.id);
+    
     return data;
   },
 
@@ -263,7 +295,18 @@ export const eventService = {
   async getCityEvents(city) {
     const { data, error } = await supabase
       .from('events')
-      .select('*')
+      .select(`
+        *,
+        group_chats:group_chat_id(
+          id,
+          name,
+          created_by_id,
+          group_chat_participants(
+            user_id,
+            joined_at
+          )
+        )
+      `)
       .eq('city', city)
       .order('date', { ascending: true });
     
@@ -275,8 +318,180 @@ export const eventService = {
   async getAllEvents() {
     const { data, error } = await supabase
       .from('events')
-      .select('*')
+      .select(`
+        *,
+        group_chats:group_chat_id(
+          id,
+          name,
+          created_by_id,
+          group_chat_participants(
+            user_id,
+            joined_at
+          )
+        )
+      `)
       .order('date', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
+// Функции для работы с групповыми чатами
+export const groupChatService = {
+  // Присоединение к групповому чату
+  async joinGroupChat(groupChatId, userId) {
+    const { data, error } = await supabase
+      .from('group_chat_participants')
+      .insert([{
+        group_chat_id: groupChatId,
+        user_id: userId,
+        joined_at: new Date().toISOString()
+      }])
+      .select(`
+        *,
+        user:users(
+          id,
+          name,
+          image
+        )
+      `)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Выход из группового чата
+  async leaveGroupChat(groupChatId, userId) {
+    const { error } = await supabase
+      .from('group_chat_participants')
+      .delete()
+      .eq('group_chat_id', groupChatId)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return true;
+  },
+
+  // Получение участников группового чата
+  async getGroupChatParticipants(groupChatId) {
+    const { data, error } = await supabase
+      .from('group_chat_participants')
+      .select(`
+        *,
+        user:users(
+          id,
+          name,
+          image
+        )
+      `)
+      .eq('group_chat_id', groupChatId)
+      .order('joined_at', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Проверка, состоит ли пользователь в групповом чате
+  async isUserInGroupChat(groupChatId, userId) {
+    const { data, error } = await supabase
+      .from('group_chat_participants')
+      .select('*')
+      .eq('group_chat_id', groupChatId)
+      .eq('user_id', userId)
+      .single();
+    
+    if (error && error.code === 'PGRST116') return null; // Not found
+    if (error) throw error;
+    return data;
+  },
+
+  // Получение сообщений группового чата
+  async getGroupChatMessages(groupChatId) {
+    const { data, error } = await supabase
+      .from('messages')
+      .select(`
+        *,
+        sender:users(
+          id,
+          name,
+          image
+        )
+      `)
+      .eq('group_chat_id', groupChatId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Отправка сообщения в групповой чат
+  async sendGroupMessage(groupChatId, messageData) {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{
+        ...messageData,
+        chat_id: null, // Для групповых чатов используем group_chat_id
+        group_chat_id: groupChatId,
+        created_at: new Date().toISOString()
+      }])
+      .select(`
+        *,
+        sender:users(
+          id,
+          name,
+          image
+        )
+      `)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Подписка на сообщения группового чата в реальном времени
+  subscribeToGroupMessages(groupChatId, callback) {
+    return supabase
+      .channel(`group_messages:${groupChatId}`)
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `group_chat_id=eq.${groupChatId}`
+        }, 
+        callback
+      )
+      .subscribe();
+  },
+
+  // Получение информации о групповом чате
+  async getGroupChat(groupChatId) {
+    const { data, error } = await supabase
+      .from('group_chats')
+      .select(`
+        *,
+        event:events(
+          id,
+          title,
+          description,
+          date,
+          time,
+          address
+        ),
+        group_chat_participants(
+          user_id,
+          joined_at,
+          user:users(
+            id,
+            name,
+            image
+          )
+        )
+      `)
+      .eq('id', groupChatId)
+      .single();
     
     if (error) throw error;
     return data;
