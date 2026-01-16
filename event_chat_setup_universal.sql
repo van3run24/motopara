@@ -87,6 +87,7 @@ DROP TRIGGER IF EXISTS on_event_create_chat ON events;
 CREATE TRIGGER on_event_create_chat
     AFTER INSERT ON events
     FOR EACH ROW
+    DEFERRABLE INITIALLY DEFERRED
     EXECUTE FUNCTION create_event_chat();
 
 -- ============================================
@@ -176,9 +177,9 @@ CREATE POLICY "Users can send messages in joined event chats" ON event_messages
 CREATE OR REPLACE FUNCTION clear_schema_cache()
 RETURNS void AS $$
 BEGIN
-    NOTIFY pg_stat_reset();
+    PERFORM pg_stat_reset();
 END;
 $$ LANGUAGE plpgsql;
 
 -- Вызываем функцию после создания всех таблиц
-SELECT clear_schema_cache();
+-- SELECT clear_schema_cache();
