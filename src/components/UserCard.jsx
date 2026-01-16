@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import React from 'react';
 import { Heart, X, Zap } from 'lucide-react';
 
 const UserCard = ({ 
@@ -89,4 +89,4 @@ const UserCard = ({
   );
 };
 
-export default memo(UserCard);
+export default UserCard;
