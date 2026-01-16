@@ -183,7 +183,8 @@ export const chatService = {
 
   // Получение чатов пользователя
   async getUserChats(userId) {
-    const { data, error } = await supabase
+    // Получаем обычные чаты
+    const { data: regularChats, error: chatsError } = await supabase
       .from('chats')
       .select(`
         *,
@@ -193,8 +194,38 @@ export const chatService = {
       .or(`participant_1_id.eq.${userId},participant_2_id.eq.${userId}`)
       .order('created_at', { ascending: false });
     
-    if (error) throw error;
-    return data;
+    if (chatsError) throw chatsError;
+    
+    // Получаем групповые чаты где пользователь участник
+    const { data: groupChats, error: groupChatsError } = await supabase
+      .from('group_chat_participants')
+      .select(`
+        group_chat_id,
+        joined_at,
+        group_chats:group_chat_id(
+          id,
+          name,
+          created_at,
+          created_by_id
+        )
+      `)
+      .eq('user_id', userId)
+      .order('joined_at', { ascending: false });
+    
+    if (groupChatsError) throw groupChatsError;
+    
+    // Форматируем групповые чаты в тот же формат что и обычные
+    const formattedGroupChats = groupChats.map(gp => ({
+      id: gp.group_chats.id,
+      name: gp.group_chats.name,
+      created_at: gp.group_chats.created_at,
+      is_group_chat: true,
+      group_chat_id: gp.group_chat_id,
+      joined_at: gp.joined_at
+    }));
+    
+    // Объединяем чаты
+    return [...regularChats, ...formattedGroupChats];
   },
 
   // Отправка сообщения
