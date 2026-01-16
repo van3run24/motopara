@@ -2484,7 +2484,36 @@ const MainApp = () => {
                   
                   return (
                     <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
-                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                      {!isOwnMessage && (
+                        <div className="order-1 mr-2">
+                          <button
+                            onClick={() => {
+                              const sender = msg.sender;
+                              if (sender) {
+                                const matchData = {
+                                  id: sender.id,
+                                  name: sender.name,
+                                  image: sender.image,
+                                  age: 25, // временно, можно добавить в users
+                                  city: userData?.city || '',
+                                  bike: 'Мотоцикл',
+                                  about: ''
+                                };
+                                setMatchData(matchData);
+                                setViewingProfile(true);
+                              }
+                            }}
+                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform"
+                          >
+                            {msg.sender?.image ? (
+                              <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              <User size={14} className="text-white" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-2'}`}>
                         {/* Показываем имя только для чужих сообщений и если это первое сообщение от этого пользователя */}
                         {!isOwnMessage && showName && (
                           <div className="px-3 pb-1">
