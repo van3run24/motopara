@@ -10,16 +10,24 @@ const corsHeaders = {
 // VAPID ключи из environment variables
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || ''
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || ''
-const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:your-email@example.com'
-
-if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  console.error('VAPID keys not configured in environment variables')
-}
+const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@motopara.ru'
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // Проверка VAPID ключей
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.error('VAPID keys not configured in environment variables')
+    return new Response(
+      JSON.stringify({ error: 'VAPID keys not configured' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    )
   }
 
   try {
@@ -28,31 +36,41 @@ serve(async (req) => {
     if (method === 'POST') {
       const { title, body, icon, tag, userId } = await req.json()
       
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: 'userId is required' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
       // Получаем подписки пользователей
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? ''
       )
       
-      let subscriptions = []
+      const { data: subscriptions, error } = await supabaseClient
+        .from('push_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
       
-      if (userId) {
-        // Отправка конкретному пользователю
-        const { data, error } = await supabaseClient
-          .from('push_subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-        
-        if (error) throw error
-        subscriptions = data
-      } else {
-        // Отправка всем пользователям
-        const { data, error } = await supabaseClient
-          .from('push_subscriptions')
-          .select('*')
-        
-        if (error) throw error
-        subscriptions = data
+      if (error) {
+        console.error('Error fetching subscriptions:', error)
+        throw error
+      }
+      
+      if (!subscriptions || subscriptions.length === 0) {
+        console.log('No push subscriptions found for user:', userId)
+        return new Response(
+          JSON.stringify({ success: true, message: 'No subscriptions found' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
       }
       
       // Настраиваем VAPID
@@ -83,7 +101,7 @@ serve(async (req) => {
             vibrate: [100, 50, 100],
             tag: tag || 'motopara-notification',
             data: { 
-              url: window.location.origin,
+              url: '/', // Используем корневой URL вместо window.location.origin
               dateOfArrival: Date.now()
             }
           })
@@ -127,6 +145,7 @@ serve(async (req) => {
     })
     
   } catch (error) {
+    console.error('Push notification error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

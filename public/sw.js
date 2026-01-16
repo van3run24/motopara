@@ -66,8 +66,7 @@ self.addEventListener('fetch', event => {
 
 // Push уведомления
 self.addEventListener('push', event => {
-  const options = {
-    body: event.data ? event.data.text() : 'Новое уведомление',
+  let options = {
     icon: '/favicons/android-chrome-192x192.png',
     badge: '/favicons/favicon-32x32.png',
     vibrate: [100, 50, 100],
@@ -89,8 +88,36 @@ self.addEventListener('push', event => {
     ]
   };
 
+  try {
+    // Пытаемся распарсить JSON payload от Edge Function
+    if (event.data) {
+      const payload = event.data.json();
+      options = {
+        ...options,
+        title: payload.title || 'МОТОЗНАКОМСТВА',
+        body: payload.body || 'Новое уведомление',
+        icon: payload.icon || options.icon,
+        badge: payload.badge || options.badge,
+        tag: payload.tag || 'motopara-notification',
+        data: {
+          ...options.data,
+          url: payload.data?.url || '/',
+          ...payload.data
+        }
+      };
+    }
+  } catch (error) {
+    // Если payload не JSON, используем текст
+    console.log('Push payload parsing failed, using text:', error);
+    options = {
+      ...options,
+      title: 'МОТОЗНАКОМСТВА',
+      body: event.data ? event.data.text() : 'Новое уведомление'
+    };
+  }
+
   event.waitUntil(
-    self.registration.showNotification('МОТОЗНАКОМСТВА', options)
+    self.registration.showNotification(options.title, options)
   );
 });
 
@@ -98,10 +125,27 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   
-  if (event.action === 'explore') {
-    // Открываем приложение
-    event.waitUntil(
-      clients.openWindow('/')
-    );
+  const urlToOpen = event.notification.data?.url || '/';
+  
+  if (event.action === 'close') {
+    return;
   }
+  
+  // Ищем открытые вкладки приложения
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Если есть открытая вкладка, фокусируемся на ней
+        for (const client of clientList) {
+          if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        
+        // Иначе открываем новую вкладку
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
 });

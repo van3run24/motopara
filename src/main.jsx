@@ -68,6 +68,9 @@ async function savePushSubscription(subscription) {
       return;
     }
 
+    console.log('Saving push subscription for user:', userId);
+    console.log('Subscription endpoint:', subscription.endpoint);
+
     const response = await fetch(`${process.env.REACT_APP_SUPABASE_URL}/functions/v1/save-push-subscription`, {
       method: 'POST',
       headers: {
@@ -83,13 +86,16 @@ async function savePushSubscription(subscription) {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to save subscription');
+      const errorText = await response.text();
+      console.error('Failed to save push subscription:', response.status, errorText);
+      throw new Error(`Failed to save subscription: ${response.status}`);
     }
 
     const result = await response.json();
-    console.log('Push subscription saved:', result);
+    console.log('Push subscription saved successfully:', result);
   } catch (error) {
     console.error('Error saving push subscription:', error);
+    // Не показываем ошибку пользователю, так как это не критично
   }
 }
 
