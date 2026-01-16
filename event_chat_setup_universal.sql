@@ -80,15 +80,24 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- ТРИГГЕРЫ
+-- ОГРАНИЧЕНИЯ ДЛЯ ТРИГГЕРА
 -- ============================================
 
-DROP TRIGGER IF EXISTS on_event_create_chat ON events;
+DROP TRIGGER IF EXISTS on_event_create_chat;
+
+-- Создаем ограничение для триггера
+CREATE CONSTRAINT IF NOT EXISTS on_event_create_chat_trigger_deferred, 
+DEFERRABLE INITIALLY DEFERRED;
+
+-- Создаем тригер
 CREATE TRIGGER on_event_create_chat
     AFTER INSERT ON events
     FOR EACH ROW
-    DEFERRABLE INITIALLY DEFERRED
-    EXECUTE FUNCTION create_event_chat();
+    WHEN (TG_OP = 'INSERT') THEN
+        EXECUTE FUNCTION create_event_chat();
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 -- ============================================
 -- RLS ПОЛИТИКИ
