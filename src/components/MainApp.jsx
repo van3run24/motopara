@@ -2461,10 +2461,10 @@ const MainApp = () => {
                       {selectedGroupChat.group_chat_participants?.length || 0} участников
                     </p>
                     <button 
-                      onClick={() => setShowParticipants(!showParticipants)}
+                      onClick={() => setShowParticipants(true)}
                       className="text-[9px] text-orange-500 font-bold uppercase hover:text-orange-400 transition-colors"
                     >
-                      {showParticipants ? 'Скрыть' : 'Показать'}
+                      Участники
                     </button>
                   </div>
                 </div>
@@ -2488,9 +2488,8 @@ const MainApp = () => {
                   const currentUserId = localStorage.getItem('userId');
                   const isOwnMessage = msg.sender_id === currentUserId;
                   
-                  // Проверяем, нужно ли показывать имя (как в Telegram)
-                  const showName = idx === 0 || 
-                    selectedGroupChat.messages[idx - 1]?.sender_id !== msg.sender_id;
+                  // Показываем имя для всех входящих сообщений
+                  const showName = !isOwnMessage;
                   
                   return (
                     <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
@@ -2518,12 +2517,12 @@ const MainApp = () => {
                                   }
                                 }
                               }}
-                              className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
+                              className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
                             >
                               {msg.sender?.image ? (
                                 <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
                               ) : (
-                                <User size={12} className="text-white" />
+                                <User size={14} className="text-white" />
                               )}
                             </button>
                           )}
@@ -2573,41 +2572,6 @@ const MainApp = () => {
                 </div>
               )}
               <div ref={messagesEndRef} />
-              
-              {/* Список участников */}
-              {showParticipants && selectedGroupChat.group_chat_participants && (
-                <div className="border-t border-white/5 pt-4 mt-4">
-                  <h5 className="text-xs font-bold text-zinc-400 uppercase mb-3">Участники чата</h5>
-                  <div className="space-y-2">
-                    {selectedGroupChat.group_chat_participants.map((participant) => (
-                      <button
-                        key={participant.user_id}
-                        onClick={() => {
-                          if (participant.user) {
-                            const fullUserData = bikers.find(b => b.id === participant.user.id);
-                            if (fullUserData) {
-                              setMatchData(fullUserData);
-                              setViewingProfile(true);
-                            }
-                          }
-                        }}
-                        className="flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors w-full text-left"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center">
-                          {participant.user?.image ? (
-                            <img src={participant.user.image} alt={participant.user.name} className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            <User size={14} className="text-white" />
-                          )}
-                        </div>
-                        <span className="text-sm text-white font-medium">
-                          {participant.user?.name || 'Пользователь'}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             <div className="shrink-0 border-t border-white/5 p-4 bg-black/80 backdrop-blur-xl">
               <div className="flex items-center gap-2">
@@ -3417,6 +3381,65 @@ const MainApp = () => {
         </div>
       )}
       
+      {/* МОДАЛЬНОЕ ОКНО УЧАСТНИКОВ ГРУППОВОГО ЧАТА */}
+      {showParticipants && selectedGroupChat && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowParticipants(false)}
+          />
+          <div className="relative w-full max-w-md bg-[#1c1c1e]/95 border border-white/10 rounded-[32px] shadow-2xl backdrop-blur-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h3 className="text-xl font-black text-white uppercase italic">Участники чата</h3>
+              <button 
+                onClick={() => setShowParticipants(false)}
+                className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                {selectedGroupChat.group_chat_participants?.map((participant) => (
+                  <button
+                    key={participant.user_id}
+                    onClick={() => {
+                      if (participant.user) {
+                        const fullUserData = bikers.find(b => b.id === participant.user.id);
+                        if (fullUserData) {
+                          setMatchData(fullUserData);
+                          setViewingProfile(true);
+                          setShowParticipants(false);
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors w-full text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      {participant.user?.image ? (
+                        <img src={participant.user.image} alt={participant.user.name} className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <User size={16} className="text-white" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm text-white font-medium block">
+                        {participant.user?.name || 'Пользователь'}
+                      </span>
+                      <span className="text-xs text-zinc-400">
+                        {participant.user?.age ? `${participant.user.age} лет` : ''}
+                      </span>
+                    </div>
+                    <ChevronRight size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* МОДАЛЬНОЕ ОКНО ПРОСМОТРА ФОТО */}
       {selectedImage && (
         <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
