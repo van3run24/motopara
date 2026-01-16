@@ -1266,9 +1266,19 @@ const MainApp = () => {
         name: groupChatData.name,
         created_at: groupChatData.created_at,
         is_group_chat: true,
-        group_chat_id: groupChatId
+        group_chat_id: groupChatId,
+        // Добавляем данные для отображения
+        image: null, // у групповых чатов нет аватара
+        partnerId: null, // у групповых чатов нет партнера
+        unreadCount: 0
       };
-      setChats(prevChats => [formattedGroupChat, ...prevChats]);
+      
+      console.log('Добавляем групповой чат в список:', formattedGroupChat);
+      setChats(prevChats => {
+        const updatedChats = [formattedGroupChat, ...prevChats];
+        console.log('Обновленный список чатов:', updatedChats);
+        return updatedChats;
+      });
       
       alert('Вы присоединились к чату события!');
     } catch (err) {
@@ -2484,43 +2494,53 @@ const MainApp = () => {
                   
                   return (
                     <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}>
-                      {!isOwnMessage && (
-                        <div className="order-1 mr-2">
-                          <button
-                            onClick={() => {
-                              const sender = msg.sender;
-                              if (sender) {
-                                const matchData = {
-                                  id: sender.id,
-                                  name: sender.name,
-                                  image: sender.image,
-                                  age: 25, // временно, можно добавить в users
-                                  city: userData?.city || '',
-                                  bike: 'Мотоцикл',
-                                  about: ''
-                                };
-                                setMatchData(matchData);
-                                setViewingProfile(true);
-                              }
-                            }}
-                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform"
-                          >
-                            {msg.sender?.image ? (
-                              <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              <User size={14} className="text-white" />
+                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                        {/* Показываем имя и фото для чужих сообщений */}
+                        {!isOwnMessage && (
+                          <>
+                            {showName && (
+                              <div className="px-3 pb-1">
+                                <button
+                                  onClick={() => {
+                                    const sender = msg.sender;
+                                    if (sender) {
+                                      // Находим полные данные пользователя в bikers
+                                      const fullUserData = bikers.find(b => b.id === sender.id);
+                                      if (fullUserData) {
+                                        setMatchData(fullUserData);
+                                        setViewingProfile(true);
+                                      }
+                                    }
+                                  }}
+                                  className="text-xs font-bold text-orange-500 uppercase hover:text-orange-400 transition-colors"
+                                >
+                                  {msg.sender?.name || 'Пользователь'}
+                                </button>
+                              </div>
                             )}
-                          </button>
-                        </div>
-                      )}
-                      <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-2'}`}>
-                        {/* Показываем имя только для чужих сообщений и если это первое сообщение от этого пользователя */}
-                        {!isOwnMessage && showName && (
-                          <div className="px-3 pb-1">
-                            <span className="text-xs font-bold text-orange-500 uppercase">
-                              {msg.sender?.name || 'Пользователь'}
-                            </span>
-                          </div>
+                            <div className="flex items-end gap-2">
+                              <button
+                                onClick={() => {
+                                  const sender = msg.sender;
+                                  if (sender) {
+                                    // Находим полные данные пользователя в bikers
+                                    const fullUserData = bikers.find(b => b.id === sender.id);
+                                    if (fullUserData) {
+                                      setMatchData(fullUserData);
+                                      setViewingProfile(true);
+                                    }
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0"
+                              >
+                                {msg.sender?.image ? (
+                                  <img src={msg.sender.image} alt={msg.sender.name} className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <User size={12} className="text-white" />
+                                )}
+                              </button>
+                            </div>
+                          </>
                         )}
                         <div className={`group relative px-4 py-2 rounded-2xl ${
                           isOwnMessage 
