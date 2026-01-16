@@ -630,6 +630,7 @@ const MainApp = () => {
   const [selectedGroupChat, setSelectedGroupChat] = useState(null);
   const [groupChatMessageInput, setGroupChatMessageInput] = useState('');
   const [showGroupChatEmojiPicker, setShowGroupChatEmojiPicker] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
 
   const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', time: '', address: '', link: '' });
   const fileInputRef = useRef(null);
@@ -1292,16 +1293,18 @@ const MainApp = () => {
           return;
         }
         await joinGroupChat(event.group_chat_id);
-      } else {
-        // Если пользователь уже в чате, загружаем данные чата
-        const groupChatData = await groupChatService.getGroupChat(event.group_chat_id);
-        const messages = await groupChatService.getGroupChatMessages(event.group_chat_id);
-        
-        setSelectedGroupChat({
-          ...groupChatData,
-          messages: messages
-        });
       }
+      
+      // Загружаем данные чата
+      const groupChatData = await groupChatService.getGroupChat(event.group_chat_id);
+      const messages = await groupChatService.getGroupChatMessages(event.group_chat_id);
+      
+      // Переключаем на вкладку "Чаты" и открываем групповой чат
+      setActiveTab('chats');
+      setSelectedGroupChat({
+        ...groupChatData,
+        messages: messages
+      });
     } catch (err) {
       console.error('Error opening group chat:', err);
       alert('Ошибка открытия чата: ' + err.message);
@@ -2403,9 +2406,17 @@ const MainApp = () => {
                 </div>
                 <div className="flex-1">
                   <h4 className="font-bold text-sm uppercase italic">{selectedGroupChat.name || 'Чат события'}</h4>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase">
-                    {selectedGroupChat.group_chat_participants?.length || 0} участников
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[9px] text-zinc-500 font-bold uppercase">
+                      {selectedGroupChat.group_chat_participants?.length || 0} участников
+                    </p>
+                    <button 
+                      onClick={() => setShowParticipants(!showParticipants)}
+                      className="text-[9px] text-orange-500 font-bold uppercase hover:text-orange-400 transition-colors"
+                    >
+                      {showParticipants ? 'Скрыть' : 'Показать'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2486,6 +2497,29 @@ const MainApp = () => {
                 </div>
               )}
               <div ref={messagesEndRef} />
+              
+              {/* Список участников */}
+              {showParticipants && selectedGroupChat.group_chat_participants && (
+                <div className="border-t border-white/5 pt-4 mt-4">
+                  <h5 className="text-xs font-bold text-zinc-400 uppercase mb-3">Участники чата</h5>
+                  <div className="space-y-2">
+                    {selectedGroupChat.group_chat_participants.map((participant) => (
+                      <div key={participant.user_id} className="flex items-center gap-3 p-2 bg-white/5 rounded-lg">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center">
+                          {participant.user?.image ? (
+                            <img src={participant.user.image} alt={participant.user.name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <User size={14} className="text-white" />
+                          )}
+                        </div>
+                        <span className="text-sm text-white font-medium">
+                          {participant.user?.name || 'Пользователь'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="shrink-0 border-t border-white/5 p-4 bg-black/80 backdrop-blur-xl">
               <div className="flex items-center gap-2">

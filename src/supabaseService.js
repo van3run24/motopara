@@ -465,7 +465,6 @@ export const groupChatService = {
       .from('messages')
       .insert([{
         ...messageData,
-        chat_id: null, // Для групповых чатов используем group_chat_id
         group_chat_id: groupChatId,
         created_at: new Date().toISOString()
       }])
