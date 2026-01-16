@@ -1560,6 +1560,33 @@ const MainApp = () => {
   }, [chats]);
 
 
+  // Функция для загрузки полного профиля пользователя
+  const loadUserProfile = async (userId) => {
+    try {
+      // Сначала ищем в bikers
+      let userData = bikers.find(b => b.id === userId);
+      
+      // Если не найдено, загружаем из базы
+      if (!userData) {
+        userData = await userService.getUserById(userId);
+      }
+      
+      return userData;
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      return null;
+    }
+  };
+
+  // Функция для открытия профиля пользователя
+  const openUserProfile = async (userId) => {
+    const userData = await loadUserProfile(userId);
+    if (userData) {
+      setMatchData(userData);
+      setViewingProfile(true);
+    }
+  };
+
   // Обработка ошибок
   if (error) {
     return (
@@ -2495,18 +2522,10 @@ const MainApp = () => {
                           {/* Аватарка для входящих сообщений */}
                           {!isOwnMessage && (
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 const sender = msg.sender;
                                 if (sender) {
-                                  // Сначала ищем в bikers, если нет - используем данные из sender
-                                  const fullUserData = bikers.find(b => b.id === sender.id) || {
-                                    ...sender,
-                                    images: sender.images || [sender.image].filter(Boolean)
-                                  };
-                                  if (fullUserData) {
-                                    setMatchData(fullUserData);
-                                    setViewingProfile(true);
-                                  }
+                                  await openUserProfile(sender.id);
                                 }
                               }}
                               className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center hover:scale-110 transition-transform flex-shrink-0 border-2 border-black"
@@ -2527,18 +2546,10 @@ const MainApp = () => {
                             {/* Имя отправителя внутри сообщения */}
                             {!isOwnMessage && (
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   const sender = msg.sender;
                                   if (sender) {
-                                    // Сначала ищем в bikers, если нет - используем данные из sender
-                                    const fullUserData = bikers.find(b => b.id === sender.id) || {
-                                      ...sender,
-                                      images: sender.images || [sender.image].filter(Boolean)
-                                    };
-                                    if (fullUserData) {
-                                      setMatchData(fullUserData);
-                                      setViewingProfile(true);
-                                    }
+                                    await openUserProfile(sender.id);
                                   }
                                 }}
                                 className="text-xs font-bold text-orange-500 hover:text-orange-400 transition-colors mb-1 text-left"
@@ -3419,18 +3430,10 @@ const MainApp = () => {
                 {selectedGroupChat.group_chat_participants?.map((participant) => (
                   <div key={participant.user_id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors w-full text-left group">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (participant.user) {
-                          // Сначала ищем в bikers, если нет - используем данные из participant.user
-                          const fullUserData = bikers.find(b => b.id === participant.user.id) || {
-                            ...participant.user,
-                            images: participant.user.images || [participant.user.image].filter(Boolean)
-                          };
-                          if (fullUserData) {
-                            setMatchData(fullUserData);
-                            setViewingProfile(true);
-                            setShowParticipants(false);
-                          }
+                          await openUserProfile(participant.user.id);
+                          setShowParticipants(false);
                         }
                       }}
                       className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center group-hover:scale-110 transition-transform"
