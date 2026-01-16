@@ -1197,13 +1197,11 @@ const MainApp = () => {
           time: newEvent.time,
           address: newEvent.address,
           link: newEvent.link,
-          created_by_id: userId,
-          created_at: new Date().toISOString()
+          created_by_id: userId
         };
         
-        const { error } = await supabase
-          .from('events')
-          .insert([eventData]);
+        console.log('🚀 Вызываем eventService.createEvent с данными:', eventData);
+        const { error } = await eventService.createEvent(eventData);
           
         if (error) throw error;
         

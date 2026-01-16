@@ -246,49 +246,82 @@ export const chatService = {
 export const eventService = {
   // Создание события
   async createEvent(eventData) {
-    // Сначала создаем групповой чат для события
-    const { data: groupChat, error: chatError } = await supabase
-      .from('group_chats')
-      .insert([{
-        event_id: null, // временно null, обновим после создания события
-        name: eventData.title,
-        created_by_id: eventData.created_by_id,
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
+    console.log('🔥 createEvent начал работу с данными:', eventData);
     
-    if (chatError) throw chatError;
-    
-    // Добавляем создателя в участники чата
-    await supabase
-      .from('group_chat_participants')
-      .insert([{
-        group_chat_id: groupChat.id,
-        user_id: eventData.created_by_id,
-        joined_at: new Date().toISOString()
-      }]);
-    
-    // Создаем событие с привязкой к групповому чату
-    const { data, error } = await supabase
-      .from('events')
-      .insert([{
-        ...eventData,
-        group_chat_id: groupChat.id,
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // Обновляем event_id в групповом чате
-    await supabase
-      .from('group_chats')
-      .update({ event_id: data.id })
-      .eq('id', groupChat.id);
-    
-    return data;
+    try {
+      // Сначала создаем групповой чат для события
+      console.log('📝 Создаем групповой чат...');
+      const { data: groupChat, error: chatError } = await supabase
+        .from('group_chats')
+        .insert([{
+          event_id: null, // временно null, обновим после создания события
+          name: eventData.title,
+          created_by_id: eventData.created_by_id,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      
+      if (chatError) {
+        console.error('❌ Ошибка создания group_chat:', chatError);
+        throw chatError;
+      }
+      console.log('✅ Group chat создан:', groupChat);
+      
+      // Добавляем создателя в участники чата
+      console.log('👥 Добавляем создателя в участники...');
+      const { error: participantError } = await supabase
+        .from('group_chat_participants')
+        .insert([{
+          group_chat_id: groupChat.id,
+          user_id: eventData.created_by_id,
+          joined_at: new Date().toISOString()
+        }]);
+      
+      if (participantError) {
+        console.error('❌ Ошибка добавления участника:', participantError);
+        throw participantError;
+      }
+      console.log('✅ Участник добавлен');
+      
+      // Создаем событие с привязкой к групповому чату
+      console.log('📅 Создаем событие...');
+      const { data, error } = await supabase
+        .from('events')
+        .insert([{
+          ...eventData,
+          group_chat_id: groupChat.id,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Ошибка создания события:', error);
+        throw error;
+      }
+      console.log('✅ Событие создано:', data);
+      
+      // Обновляем event_id в групповом чате
+      console.log('🔄 Обновляем event_id в групповом чате...');
+      const { error: updateError } = await supabase
+        .from('group_chats')
+        .update({ event_id: data.id })
+        .eq('id', groupChat.id);
+      
+      if (updateError) {
+        console.error('❌ Ошибка обновления чата:', updateError);
+        throw updateError;
+      }
+      console.log('✅ Group chat обновлен');
+      
+      console.log('🎉 createEvent успешно завершен!');
+      return data;
+      
+    } catch (error) {
+      console.error('💥 Критическая ошибка в createEvent:', error);
+      throw error;
+    }
   },
 
   // Получение событий города
