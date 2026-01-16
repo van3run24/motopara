@@ -256,7 +256,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .from('events')
         .select(`
           *,
-          group_chats:group_chat_id(
+          group_chats!events_group_chat_id_fkey(
             id,
             name,
             created_by_id,
