@@ -1220,6 +1220,24 @@ const MainApp = () => {
   };
 
   // Функции для групповых чатов
+  const openGroupChatFromChats = async (chat) => {
+    try {
+      const userId = localStorage.getItem('userId');
+      
+      // Загружаем данные чата
+      const groupChatData = await groupChatService.getGroupChat(chat.group_chat_id);
+      const messages = await groupChatService.getGroupChatMessages(chat.group_chat_id);
+      
+      setSelectedGroupChat({
+        ...groupChatData,
+        messages: messages
+      });
+    } catch (err) {
+      console.error('Error opening group chat from chats:', err);
+      alert('Ошибка открытия чата: ' + err.message);
+    }
+  };
+
   const joinGroupChat = async (groupChatId) => {
     try {
       const userId = localStorage.getItem('userId');
@@ -1241,6 +1259,16 @@ const MainApp = () => {
       // Загружаем информацию о групповом чате
       const groupChatData = await groupChatService.getGroupChat(groupChatId);
       setSelectedGroupChat(groupChatData);
+      
+      // Добавляем групповой чат в список чатов
+      const formattedGroupChat = {
+        id: groupChatData.id,
+        name: groupChatData.name,
+        created_at: groupChatData.created_at,
+        is_group_chat: true,
+        group_chat_id: groupChatId
+      };
+      setChats(prevChats => [formattedGroupChat, ...prevChats]);
       
       alert('Вы присоединились к чату события!');
     } catch (err) {
@@ -2126,7 +2154,13 @@ const MainApp = () => {
                         <button 
                           onClick={() => {
                             setSwipedChatId(null);
-                            openChat(chat);
+                            if (chat.is_group_chat) {
+                              // Открываем групповой чат
+                              openGroupChatFromChats(chat);
+                            } else {
+                              // Открываем обычный чат
+                              openChat(chat);
+                            }
                           }} 
                           className={`w-full flex items-center gap-4 p-5 rounded-[24px] border hover:scale-[1.01] active:scale-[0.99] transition-all text-left shrink-0 ${
                             isNewMatch 
@@ -2135,8 +2169,14 @@ const MainApp = () => {
                           }`}
                         >
                           <div className="relative">
-                            <img src={chat.image || DEFAULT_AVATAR} className={`w-14 h-14 rounded-[22px] object-cover ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`} alt="" />
-                            {onlineUsers.has(chat.partnerId) && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>}
+                            {chat.is_group_chat ? (
+                              <div className={`w-14 h-14 rounded-[22px] bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`}>
+                                <MessageCircle size={24} className="text-white" />
+                              </div>
+                            ) : (
+                              <img src={chat.image || DEFAULT_AVATAR} className={`w-14 h-14 rounded-[22px] object-cover ${isNewMatch ? 'ring-2 ring-orange-500' : ''}`} alt="" />
+                            )}
+                            {!chat.is_group_chat && onlineUsers.has(chat.partnerId) && <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>}
                             {chat.unreadCount > 0 && <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-600 rounded-full border-4 border-black flex items-center justify-center text-[10px] font-black">{chat.unreadCount}</div>}
                           </div>
                           <div className="flex-1">
