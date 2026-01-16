@@ -257,7 +257,9 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
           *,
           participants_count:event_participants(count)
         `)
-        .or(`date.gt.${todayString},and(date.eq.${todayString},time.gt.${currentTime})`) // Только будущие события или сегодня в будущем
+        .eq('city', userData.city)
+        // Загружаем события созданные сегодня или в будущем
+        .or(`date.gt.${todayString},and(date.eq.${todayString},time.ge.${currentTime})`)
         .order('date', { ascending: true })
         .order('time', { ascending: true });
       
