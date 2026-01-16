@@ -1135,7 +1135,7 @@ const MainApp = () => {
                     const { error: uploadError } = await supabase.storage
                         .from('chat-images')
                         .upload(fileName, compressedFile, {
-                            cacheControl: '3600',
+                            cacheControl: '86400', // 24 часа кэширования
                             upsert: false
                         });
 

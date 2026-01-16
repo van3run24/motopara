@@ -111,7 +111,7 @@ export const userService = {
     const { data, error } = await supabase.storage
       .from('avatars')
       .upload(fileName, compressedFile, {
-        cacheControl: '3600',
+        cacheControl: '86400', // 24 часа кэширования
         upsert: true
       });
     
@@ -120,17 +120,15 @@ export const userService = {
        throw error;
     }
     
-    // Получаем публичный URL с временной меткой для предотвращения кэширования
+    // Получаем публичный URL без временной метки для кэширования
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(fileName);
     
-    const timestampedUrl = `${publicUrl}?t=${Date.now()}`;
-      
     // Обновляем ссылку на фото в профиле пользователя
-    await this.updateUser(userId, { image: timestampedUrl });
+    await this.updateUser(userId, { image: publicUrl });
     
-    return timestampedUrl;
+    return publicUrl;
   },
 
   // Загрузка фото в галерею
@@ -144,26 +142,24 @@ export const userService = {
     const fileExt = 'jpg'; // Всегда сохраняем как JPG после сжатия
     const fileName = `${userId}/gallery/${Date.now()}.${fileExt}`;
     
-    const { data, error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('gallery')
       .upload(fileName, compressedFile, {
-        cacheControl: '3600',
+        cacheControl: '86400', // 24 часа кэширования
         upsert: false
       });
     
-    if (error) {
-       console.error("Error uploading gallery image:", error);
-       throw error;
+    if (uploadError) {
+       console.error("Error uploading gallery image:", uploadError);
+       throw uploadError;
     }
     
-    // Получаем публичный URL с временной меткой для предотвращения кэширования
+    // Получаем публичный URL без временной метки для кэширования
     const { data: { publicUrl } } = supabase.storage
       .from('gallery')
       .getPublicUrl(fileName);
     
-    const timestampedUrl = `${publicUrl}?t=${Date.now()}`;
-    
-    return timestampedUrl;
+    return publicUrl;
   }
 };
 

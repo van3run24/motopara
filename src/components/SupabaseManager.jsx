@@ -57,9 +57,21 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
     }
   };
 
-  // Загрузка пользователей для поиска
+  // Загрузка пользователей для поиска с кэшированием
   const loadUsers = async () => {
     if (!userData) return;
+    
+    // Проверяем кэш на 5 минут
+    const cacheKey = `users_${userData.city}_${userData.gender}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { timestamp, data } = JSON.parse(cached);
+      if (Date.now() - timestamp < 5 * 60 * 1000) { // 5 минут
+        onUsersLoaded(data);
+        return;
+      }
+    }
+    
     try {
       const { data: users, error } = await supabase
         .from('users')
@@ -132,6 +144,13 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
              about: u.about // Ensure about is passed
            };
         });
+      
+      // Сохраняем в кэш
+      localStorage.setItem(cacheKey, JSON.stringify({
+        timestamp: Date.now(),
+        data: filteredUsers
+      }));
+      
       onUsersLoaded(filteredUsers);
       
     } catch (err) {
