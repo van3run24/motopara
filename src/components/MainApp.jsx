@@ -2522,9 +2522,21 @@ const MainApp = () => {
                           }`}>
                             {/* Имя отправителя внутри сообщения */}
                             {!isOwnMessage && (
-                              <div className="text-xs font-bold text-orange-500 uppercase mb-1">
+                              <button
+                                onClick={() => {
+                                  const sender = msg.sender;
+                                  if (sender) {
+                                    const fullUserData = bikers.find(b => b.id === sender.id);
+                                    if (fullUserData) {
+                                      setMatchData(fullUserData);
+                                      setViewingProfile(true);
+                                    }
+                                  }
+                                }}
+                                className="text-xs font-bold text-orange-500 hover:text-orange-400 transition-colors mb-1 text-left"
+                              >
                                 {msg.sender?.name || 'Пользователь'}
-                              </div>
+                              </button>
                             )}
                             
                             {msg.type === 'text' && (
@@ -3397,27 +3409,26 @@ const MainApp = () => {
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2">
                 {selectedGroupChat.group_chat_participants?.map((participant) => (
-                  <button
-                    key={participant.user_id}
-                    onClick={() => {
-                      if (participant.user) {
-                        const fullUserData = bikers.find(b => b.id === participant.user.id);
-                        if (fullUserData) {
-                          setMatchData(fullUserData);
-                          setViewingProfile(true);
-                          setShowParticipants(false);
+                  <div key={participant.user_id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors w-full text-left group">
+                    <button
+                      onClick={() => {
+                        if (participant.user) {
+                          const fullUserData = bikers.find(b => b.id === participant.user.id);
+                          if (fullUserData) {
+                            setMatchData(fullUserData);
+                            setViewingProfile(true);
+                            setShowParticipants(false);
+                          }
                         }
-                      }
-                    }}
-                    className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors w-full text-left group"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      }}
+                      className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-yellow-500 flex items-center justify-center group-hover:scale-110 transition-transform"
+                    >
                       {participant.user?.image ? (
                         <img src={participant.user.image} alt={participant.user.name} className="w-full h-full rounded-full object-cover" />
                       ) : (
                         <User size={16} className="text-white" />
                       )}
-                    </div>
+                    </button>
                     <div className="flex-1">
                       <span className="text-sm text-white font-medium block">
                         {participant.user?.name || 'Пользователь'}
@@ -3427,7 +3438,7 @@ const MainApp = () => {
                       </span>
                     </div>
                     <ChevronRight size={16} className="text-zinc-400 group-hover:text-white transition-colors" />
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
