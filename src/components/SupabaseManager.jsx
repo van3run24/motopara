@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Gauge, Music, Shield, Target } from 'lucide-react';
+import { chatService } from '../supabaseService';
 
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
   const [loading, setLoading] = useState(true);
@@ -262,6 +263,9 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
   // Загрузка при изменении данных
   useEffect(() => {
     if (userData?.email && localStorage.getItem('userId')) {
+      // Инициализируем storage для чатов
+      chatService.initializeChatStorage();
+      
       loadUsers();
       loadChats();
       loadEvents();
@@ -618,7 +622,7 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .from('messages')
         .insert([{
           chat_id: chatId,
-          sender_id: userId,
+          sender_id: type === 'system' ? null : userId, // Для системных сообщений sender_id = null
           text: text,
           type: type,
           image: imageUrl
@@ -650,8 +654,28 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
         .single();
 
       if (mutualLike) {
-        // Мэтч! Создаем чат
-        const chat = await window.supabaseManager.createChat(userId, targetUserId);
+        // Мэтч! Проверяем, нет ли уже чата
+        const { data: existingChat } = await supabase
+          .from('chats')
+          .select('*')
+          .or(`and(participant_1_id.eq.${userId},participant_2_id.eq.${targetUserId}),and(participant_1_id.eq.${targetUserId},participant_2_id.eq.${userId})`)
+          .single();
+        
+        let chat;
+        if (!existingChat) {
+          // Создаем новый чат только если его нет
+          chat = await window.supabaseManager.createChat(userId, targetUserId);
+          
+          // Добавляем приветственное сообщение в чат
+          await window.supabaseManager.sendMessage(
+            chat.id, 
+            '🔥 У вас новый мэтч! Начните общение', 
+            'system'
+          );
+        } else {
+          chat = existingChat;
+        }
+        
         return { isMatch: true, chat };
       }
       

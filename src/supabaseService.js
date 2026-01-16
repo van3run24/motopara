@@ -169,6 +169,34 @@ export const userService = {
 
 // Функции для работы с чатами
 export const chatService = {
+  // Инициализация storage bucket для чатов
+  async initializeChatStorage() {
+    try {
+      const { data, error } = await supabase.storage.getBucket('chat-images');
+      
+      if (error && error.message.includes('The resource was not found')) {
+        // Bucket не существует, создаем его
+        const { error: createError } = await supabase.storage.createBucket('chat-images', {
+          public: true,
+          allowedMimeTypes: ['image/*'],
+          fileSizeLimit: 5242880 // 5MB
+        });
+        
+        if (createError) {
+          console.error('Error creating chat-images bucket:', createError);
+          throw createError;
+        }
+        
+        console.log('Chat images bucket created successfully');
+      } else {
+        console.log('Chat images bucket already exists');
+      }
+    } catch (error) {
+      console.error('Error initializing chat storage:', error);
+      // Не выбрасываем ошибку, так как это не критично для основной функциональности
+    }
+  },
+
   // Создание нового чата
   async createChat(participant1Id, participant2Id) {
     const { data, error } = await supabase

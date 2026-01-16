@@ -1118,21 +1118,46 @@ const MainApp = () => {
             // Chat images (support multiple)
             const files = Array.from(e.target.files);
             for (const file of files) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-                
-                const { error: uploadError } = await supabase.storage
-                    .from('images')
-                    .upload(fileName, file);
+                try {
+                    console.log('Uploading chat image:', file.name);
+                    console.log('Original chat file size:', (file.size / 1024 / 1024).toFixed(2) + ' MB');
+                    
+                    // Сжимаем изображение перед загрузкой в чат
+                    const compressedFile = await compressImage(file, 1200, 1200, 0.8);
+                    console.log('Compressed chat file size:', (compressedFile.size / 1024 / 1024).toFixed(2) + ' MB');
+                    
+                    const fileExt = 'jpg'; // Всегда сохраняем как JPG после сжатия
+                    const fileName = `${userId}/chat/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+                    
+                    const { error: uploadError } = await supabase.storage
+                        .from('chat-images')
+                        .upload(fileName, compressedFile, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
 
-                if (uploadError) throw uploadError;
+                    if (uploadError) {
+                        console.error('Chat image upload error:', uploadError);
+                        throw uploadError;
+                    }
 
-                const { data: { publicUrl } } = supabase.storage
-                    .from('images')
-                    .getPublicUrl(fileName);
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('chat-images')
+                        .getPublicUrl(fileName);
 
-                if (selectedChat && window.supabaseManager) {
-                    await window.supabaseManager.sendMessage(selectedChat.id, '', 'image', publicUrl);
+                    console.log('Chat image uploaded successfully:', publicUrl);
+
+                    if (selectedChat && window.supabaseManager) {
+                        await window.supabaseManager.sendMessage(selectedChat.id, '', 'image', publicUrl);
+                        console.log('Chat image message sent successfully');
+                    } else {
+                        console.error('No selected chat or supabaseManager available');
+                        throw new Error('Чат не выбран');
+                    }
+                } catch (fileError) {
+                    console.error('Error processing chat image:', fileError);
+                    setError('Ошибка загрузки фото: ' + fileError.message);
+                    alert('Ошибка загрузки фото: ' + fileError.message);
                 }
             }
         }
@@ -2092,6 +2117,19 @@ const MainApp = () => {
                 }
                 
                 const msg = item;
+                
+                // Системные сообщения (например, о новом мэтче)
+                if (msg.type === 'system') {
+                  return (
+                    <div key={msg.id || idx} className="flex justify-center my-4">
+                      <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 px-4 py-2 rounded-full text-center">
+                        <p className="text-orange-400 text-sm font-medium">{msg.text}</p>
+                        <span className="text-orange-500/60 text-xs">{formatMessageTime(msg.created_at)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                
                 return (
                   <div 
                       key={msg.id || idx} 
