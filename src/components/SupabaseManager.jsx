@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { eventService } from '../supabaseService';
 import { Gauge, Music, Shield, Target } from 'lucide-react';
 
 const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoaded }) => {
@@ -253,7 +254,18 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       
       const { data: events, error } = await supabase
         .from('events')
-        .select('*')
+        .select(`
+          *,
+          group_chats:group_chat_id(
+            id,
+            name,
+            created_by_id,
+            group_chat_participants(
+              user_id,
+              joined_at
+            )
+          )
+        `)
         .or(`date.gt.${todayString},and(date.eq.${todayString},time.gt.${currentTime})`) // Только будущие события или сегодня в будущем
         .order('date', { ascending: true })
         .order('time', { ascending: true });
@@ -711,14 +723,13 @@ const SupabaseManager = ({ userData, onUsersLoaded, onChatsLoaded, onEventsLoade
       return data;
     },
     createEvent: async (eventData) => {
-      const { data, error } = await supabase
-        .from('events')
-        .insert([eventData])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      try {
+        const event = await eventService.createEvent(eventData);
+        return event;
+      } catch (error) {
+        console.error('Error creating event:', error);
+        throw error;
+      }
     },
     deleteMessage: async (messageId) => {
       const { error } = await supabase
